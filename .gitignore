@@ -1,0 +1,30 @@
+# Anchor / Rust
+target/
+node_modules/
+
+# Next.js
+app/.next/
+app/out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keypairs — NEVER commit
+*.json.bak
+new-authority.json
+
+# Test artifacts
+.anchor/
+test-ledger/

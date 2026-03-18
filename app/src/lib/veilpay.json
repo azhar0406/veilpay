@@ -1,0 +1,899 @@
+{
+  "address": "FVwSkmgzT1yvgJ1eWpfyXnaRnD86xfUKtBFHBLFfXkRb",
+  "metadata": {
+    "name": "veilpay",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Confidential programmable stablecoin payments on Solana"
+  },
+  "instructions": [
+    {
+      "name": "add_to_whitelist",
+      "discriminator": [
+        157,
+        211,
+        52,
+        54,
+        144,
+        81,
+        5,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "whitelist",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_config"
+              },
+              {
+                "kind": "arg",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "vault_config"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "role",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "confidential_transfer",
+      "docs": [
+        "Confidential transfer. remaining_accounts: 8 accounts (for balance + spent handles x 2 addresses)"
+      ],
+      "discriminator": [
+        97,
+        79,
+        128,
+        58,
+        134,
+        222,
+        73,
+        143
+      ],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_config.authority",
+                "account": "VaultConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "whitelist",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_config"
+              },
+              {
+                "kind": "account",
+                "path": "sender"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payment_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_config"
+              },
+              {
+                "kind": "account",
+                "path": "vault_config.payment_nonce",
+                "account": "VaultConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sender",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient"
+        },
+        {
+          "name": "inco_lightning_program",
+          "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_ciphertext",
+          "type": "bytes"
+        },
+        {
+          "name": "input_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Deposit. remaining_accounts: 4 accounts (allowance+addr for authority, allowance+addr for auditor)"
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_config.authority",
+                "account": "VaultConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "whitelist",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_config"
+              },
+              {
+                "kind": "account",
+                "path": "depositor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "depositor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "inco_lightning_program",
+          "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "ciphertext",
+          "type": "bytes"
+        },
+        {
+          "name": "input_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "freeze_vault",
+      "discriminator": [
+        144,
+        211,
+        63,
+        236,
+        97,
+        31,
+        170,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "vault_config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_vault",
+      "docs": [
+        "Initialize a new confidential treasury vault.",
+        "Remaining accounts (for granting decrypt access) — 4 accounts per (handle, address) pair:",
+        "For each of 3 handles x 2 addresses = 12 remaining accounts"
+      ],
+      "discriminator": [
+        48,
+        191,
+        163,
+        44,
+        71,
+        129,
+        63,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "inco_lightning_program",
+          "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "auditor",
+          "type": "pubkey"
+        },
+        {
+          "name": "spending_limit_ciphertext",
+          "type": "bytes"
+        },
+        {
+          "name": "input_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "remove_from_whitelist",
+      "discriminator": [
+        7,
+        144,
+        216,
+        239,
+        243,
+        236,
+        193,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "whitelist",
+          "writable": true
+        },
+        {
+          "name": "vault_config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "vault_config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reset_epoch",
+      "discriminator": [
+        145,
+        28,
+        214,
+        195,
+        36,
+        177,
+        16,
+        222
+      ],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "inco_lightning_program",
+          "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unfreeze_vault",
+      "discriminator": [
+        145,
+        244,
+        206,
+        234,
+        251,
+        250,
+        116,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "vault_config"
+          ]
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "PaymentRecord",
+      "discriminator": [
+        202,
+        168,
+        56,
+        249,
+        127,
+        226,
+        86,
+        226
+      ]
+    },
+    {
+      "name": "VaultConfig",
+      "discriminator": [
+        99,
+        86,
+        43,
+        216,
+        184,
+        102,
+        119,
+        77
+      ]
+    },
+    {
+      "name": "Whitelist",
+      "discriminator": [
+        204,
+        176,
+        52,
+        79,
+        146,
+        121,
+        54,
+        247
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ConfidentialDeposit",
+      "discriminator": [
+        37,
+        47,
+        203,
+        46,
+        53,
+        244,
+        223,
+        187
+      ]
+    },
+    {
+      "name": "ConfidentialTransferEvent",
+      "discriminator": [
+        24,
+        221,
+        223,
+        133,
+        221,
+        78,
+        35,
+        85
+      ]
+    },
+    {
+      "name": "VaultFrozen",
+      "discriminator": [
+        13,
+        199,
+        172,
+        111,
+        88,
+        10,
+        151,
+        247
+      ]
+    },
+    {
+      "name": "VaultInitialized",
+      "discriminator": [
+        180,
+        43,
+        207,
+        2,
+        18,
+        71,
+        3,
+        75
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotWhitelisted",
+      "msg": "Wallet not whitelisted for this vault"
+    },
+    {
+      "code": 6001,
+      "name": "VaultFrozen",
+      "msg": "Vault is currently frozen by compliance"
+    },
+    {
+      "code": 6002,
+      "name": "InsufficientRole",
+      "msg": "Insufficient permissions for this operation"
+    },
+    {
+      "code": 6003,
+      "name": "SpendingLimitExceeded",
+      "msg": "Spending limit exceeded for this epoch"
+    },
+    {
+      "code": 6004,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidAuditor",
+      "msg": "Invalid auditor address"
+    }
+  ],
+  "types": [
+    {
+      "name": "ConfidentialDeposit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "depositor",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfidentialTransferEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Euint128",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          "u128"
+        ]
+      }
+    },
+    {
+      "name": "PaymentRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "encrypted_amount",
+            "type": {
+              "defined": {
+                "name": "Euint128"
+              }
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "auditor",
+            "type": "pubkey"
+          },
+          {
+            "name": "encrypted_balance",
+            "type": {
+              "defined": {
+                "name": "Euint128"
+              }
+            }
+          },
+          {
+            "name": "encrypted_spending_limit",
+            "type": {
+              "defined": {
+                "name": "Euint128"
+              }
+            }
+          },
+          {
+            "name": "encrypted_spent_this_epoch",
+            "type": {
+              "defined": {
+                "name": "Euint128"
+              }
+            }
+          },
+          {
+            "name": "current_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "payment_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "is_frozen",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultFrozen",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "frozen_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "auditor",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Whitelist",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "role",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
