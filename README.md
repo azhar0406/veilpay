@@ -41,6 +41,188 @@ VeilPay brings institutional-grade confidentiality to programmable stablecoin pa
 - **Selective Disclosure** — Designated auditors can decrypt balances for compliance — like wearing the right lens to see the sun
 - **KYC Whitelist** — Only approved wallets can interact with vaults
 
+---
+
+## User Roles
+
+VeilPay has three distinct roles:
+
+```
+User A (Authority)  — Creates the vault, manages whitelist, can freeze/unfreeze
+User B (Auditor)    — Designated compliance officer, can decrypt vault balances
+User C (Depositor)  — Whitelisted user who deposits tokens and makes transfers
+```
+
+---
+
+## How It Works — Step by Step
+
+### Step 1: Create Vault (User A — Authority)
+
+User A creates a confidential treasury vault, choosing a stablecoin (USDC/USDT) and setting an encrypted spending limit.
+
+```
+User A ──► "Create vault with USDC, spending limit $1,000"
+              │
+              ▼
+┌──────────────────────────────┐
+│  On-Chain Vault Account      │
+│  ─────────────────────────── │
+│  authority: User A           │
+│  auditor: User B             │
+│  token: USDC                 │
+│  balance: ██████ (encrypted) │  ◄── FHE: nobody can read this
+│  limit:   ██████ (encrypted) │  ◄── FHE: $1,000 but hidden
+│  spent:   ██████ (encrypted) │  ◄── FHE: tracked privately
+└──────────────────────────────┘
+```
+
+### Step 2: Whitelist (User A — Authority)
+
+User A approves User C to interact with the vault.
+
+```
+User A ──► "Allow User C to deposit & transfer"
+              │
+              ▼
+┌──────────────────────┐
+│  Whitelist Account    │
+│  wallet: User C  ✓   │
+│  role: Depositor      │
+└──────────────────────┘
+```
+
+### Step 3: Deposit (User C — Depositor)
+
+User C deposits USDC into the vault. The real tokens move via SPL transfer, and the vault's encrypted balance is updated via FHE.
+
+```
+User C ──► "Deposit 100 USDC"
+              │
+              ├──► Real USDC Transfer ──────────────────────┐
+              │    User C's wallet ──► Vault token account  │ VISIBLE on Explorer
+              │    (100 USDC moves)                         │
+              │                                             │
+              ├──► FHE Encryption ──────────────────────────┘
+              │    encrypt(100) ──► Inco Lightning
+              │    vault.balance = e_add(old_balance, encrypted_100)
+              │
+              ▼
+┌──────────────────────────────┐
+│  Vault After Deposit         │
+│  ─────────────────────────── │
+│  USDC in vault: 100          │  ◄── visible (SPL account)
+│  balance: ██████ (encrypted) │  ◄── FHE: updated secretly
+└──────────────────────────────┘
+```
+
+### Step 4: Transfer (User C — Depositor)
+
+User C sends a confidential transfer. The spending limit is enforced **entirely on encrypted values** — the program never decrypts anything.
+
+```
+User C ──► "Send 30 USDC to Bob"
+              │
+              ▼
+┌─────────────────────────────────────────────┐
+│  FHE SPENDING LIMIT CHECK (all encrypted!)  │
+│                                             │
+│  new_spent = spent + 30      ◄── e_add()    │
+│  ok? = (limit >= new_spent)  ◄── e_ge()     │  ALL happens on
+│  actual = ok ? 30 : 0        ◄── e_select() │  ENCRYPTED values.
+│  balance = balance - actual  ◄── e_sub()    │  Nobody sees the
+│                                             │  numbers!
+└─────────────────────────────────────────────┘
+              │
+              ├──► If limit OK: Real USDC transfer
+              │    Vault ──► Bob's wallet (30 USDC)
+              │
+              ▼
+┌──────────────────────────────┐
+│  Vault After Transfer        │
+│  balance: ██████ (encrypted) │  ◄── was 100, now 70, but hidden
+│  spent:   ██████ (encrypted) │  ◄── was 0, now 30, but hidden
+│  limit:   ██████ (encrypted) │  ◄── still $1,000, hidden
+└──────────────────────────────┘
+```
+
+### Step 5: Audit (User B — Auditor)
+
+Only User B can decrypt and view the vault's true state via Inco's TEE-attested decryption.
+
+```
+User B ──► "Decrypt vault balances" (signs with wallet)
+              │
+              ▼
+Inco Covalidator ──► TEE attestation ──► reveals to User B ONLY:
+   balance = 70 USDC
+   spent   = 30 USDC
+   limit   = 1,000 USDC
+
+Nobody else can see these numbers. Not even User A (authority).
+```
+
+### Step 6: Freeze (User A — Authority)
+
+User A can freeze the vault at any time for compliance. No deposits or transfers allowed while frozen.
+
+---
+
+## What's Private vs Public
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    WHAT'S PRIVATE vs PUBLIC                   │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  PUBLIC (visible on Solana Explorer):                        │
+│  ├── SPL token transfers (amount, from, to)                 │
+│  ├── Who is the authority, auditor                          │
+│  ├── Which wallets are whitelisted                          │
+│  └── Transaction timestamps                                 │
+│                                                              │
+│  PRIVATE (encrypted via Inco FHE):                          │
+│  ├── Vault's internal balance tracking                      │
+│  ├── Spending limit value                                   │
+│  ├── How much has been spent this epoch                     │
+│  ├── Spending limit enforcement logic                       │
+│  │   (the check happens WITHOUT decrypting!)                │
+│  └── Only the auditor (User B) can decrypt                  │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## The FHE Magic — In Simple Terms
+
+```
+Traditional way:
+  if (spent + amount <= limit)  →  everyone sees spent, amount, limit
+
+VeilPay FHE way:
+  if (██████ + ██████ <= ██████) →  nobody sees the numbers
+       ▲         ▲         ▲
+       │         │         │
+    encrypted  encrypted  encrypted
+
+  Inco Lightning computes on encrypted data
+  and returns encrypted result — the program
+  never decrypts anything, yet still enforces
+  the spending limit correctly!
+```
+
+## Role Summary
+
+| Action | Who | Real Tokens Move? | FHE Used? |
+|--------|-----|-------------------|-----------|
+| Create Vault | User A (Authority) | No | Yes (encrypt limit) |
+| Whitelist | User A (Authority) | No | No |
+| Deposit | User C (Depositor) | Yes (visible) | Yes (encrypt balance) |
+| Transfer | User C (Depositor) | Yes (visible) | Yes (limit check + update) |
+| Freeze/Unfreeze | User A (Authority) | No | No |
+| Audit/Decrypt | User B (Auditor) | No | Yes (attested decrypt) |
+
+---
+
 ## Architecture
 
 ```
@@ -60,9 +242,9 @@ VeilPay brings institutional-grade confidentiality to programmable stablecoin pa
 |-------|-----------|
 | Smart Contract | Anchor 0.31.1 (Rust) |
 | Privacy | Inco Lightning SVM 0.1.4 (FHE) |
-| Token Standard | SPL Token + Token-2022 |
+| Token Standard | SPL Token (USDC/USDT) |
 | Frontend | Next.js 16, Tailwind CSS |
-| Wallet | Solana Wallet Adapter |
+| Wallet | Solana Wallet Adapter (Phantom) |
 | Network | Solana Devnet |
 
 ## Program Instructions
@@ -76,17 +258,6 @@ VeilPay brings institutional-grade confidentiality to programmable stablecoin pa
 | `confidential_transfer` | Transfer encrypted amount to a recipient with spending limit checks |
 | `freeze_vault` / `unfreeze_vault` | Compliance freeze/unfreeze |
 | `reset_epoch` | Reset spending tracker when epoch changes |
-
-## How It Works
-
-1. **Treasury admin** creates a confidential vault with an encrypted spending limit
-2. **Admin whitelists** approved wallets with specific roles
-3. **Depositors** encrypt amounts client-side and deposit — balance updates are encrypted on-chain
-4. **Transferrers** send confidential payments — amounts invisible on Solana Explorer
-5. **Auditor** can decrypt vault balances and payment amounts for compliance review
-6. All encrypted operations use Inco Lightning's FHE (Fully Homomorphic Encryption) via CPI
-
-> Like staring at the sun — the data is there on-chain, blazing in full view, but no one can read it without the right cryptographic lens.
 
 ## Getting Started
 
@@ -120,7 +291,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and connect your Phantom/Solflare wallet.
+Open [http://localhost:3000](http://localhost:3000) and connect your Phantom wallet.
 
 ## Program ID
 
@@ -130,12 +301,14 @@ FVwSkmgzT1yvgJ1eWpfyXnaRnD86xfUKtBFHBLFfXkRb
 
 ## Demo Flow
 
-1. Connect wallet → Create Vault (set auditor + spending limit)
-2. Whitelist a depositor wallet
-3. Deposit encrypted amount
-4. Send confidential transfer
-5. Switch to auditor wallet → Decrypt and view full history
-6. Check Solana Explorer — all amounts are opaque on-chain
+1. **User A** connects wallet → Creates vault (sets User B as auditor, picks USDC, sets spending limit)
+2. **User A** whitelists User C's wallet as a depositor
+3. **User C** connects → Deposits USDC into the vault
+4. **User C** sends a confidential transfer to another wallet
+5. **User B** connects → Decrypts and views full vault balances and payment history
+6. Check Solana Explorer — all internal vault amounts are opaque on-chain
+
+> Like staring at the sun — the data is there on-chain, blazing in full view, but no one can read it without the right cryptographic lens.
 
 ## Team
 

@@ -75,7 +75,7 @@ export function getProvider(wallet: AnchorWallet): AnchorProvider {
 
 export function getVaultPda(authority: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("vault_config"), authority.toBuffer()],
+    [Buffer.from("vault_v2"), authority.toBuffer()],
     PROGRAM_ID
   );
 }

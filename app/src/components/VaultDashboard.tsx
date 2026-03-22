@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useVeilPay } from "@/hooks/useVeilPay";
@@ -12,6 +12,12 @@ import WhitelistManager from "./WhitelistManager";
 import AuditorView from "./AuditorView";
 import PaymentHistory from "./PaymentHistory";
 import USXFaucet from "./USXFaucet";
+
+interface Toast {
+  message: string;
+  type: "success" | "error";
+  id: number;
+}
 
 export default function VaultDashboard() {
   const { connected, publicKey } = useWallet();
@@ -33,9 +39,52 @@ export default function VaultDashboard() {
   const [showDeposit, setShowDeposit] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showWhitelist, setShowWhitelist] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const showToast = useCallback((message: string, type: "success" | "error") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { message, type, id }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  }, []);
 
   const isAuthority = vault && publicKey && vault.authority.equals(publicKey);
   const isAuditor = vault && publicKey && vault.auditor.equals(publicKey);
+
+  // Wrapped handlers with toast feedback
+  const handleDeposit = useCallback(async (amount: number) => {
+    try {
+      await deposit(amount);
+      showToast(`Deposited ${amount} successfully`, "success");
+    } catch { showToast("Deposit failed", "error"); throw new Error("failed"); }
+  }, [deposit, showToast]);
+
+  const handleTransfer = useCallback(async (recipient: string, amount: number) => {
+    try {
+      await transfer(recipient, amount);
+      showToast(`Transferred ${amount} successfully`, "success");
+    } catch { showToast("Transfer failed", "error"); throw new Error("failed"); }
+  }, [transfer, showToast]);
+
+  const handleWhitelistAdd = useCallback(async (wallet: string, role: number) => {
+    try {
+      await addToWhitelist(wallet, role);
+      showToast("Wallet whitelisted successfully", "success");
+    } catch { showToast("Failed to whitelist", "error"); throw new Error("failed"); }
+  }, [addToWhitelist, showToast]);
+
+  const handleWhitelistRemove = useCallback(async (wallet: string) => {
+    try {
+      await removeFromWhitelist(wallet);
+      showToast("Wallet removed from whitelist", "success");
+    } catch { showToast("Failed to remove", "error"); throw new Error("failed"); }
+  }, [removeFromWhitelist, showToast]);
+
+  const handleFreeze = useCallback(async () => {
+    try {
+      await toggleFreeze();
+      showToast(vault?.isFrozen ? "Vault unfrozen" : "Vault frozen", "success");
+    } catch { showToast("Freeze/unfreeze failed", "error"); }
+  }, [toggleFreeze, vault, showToast]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
@@ -186,7 +235,7 @@ export default function VaultDashboard() {
                 </div>
                 {isAuthority && (
                   <button
-                    onClick={toggleFreeze}
+                    onClick={handleFreeze}
                     disabled={loading}
                     className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
                     style={{
@@ -297,22 +346,23 @@ export default function VaultDashboard() {
       {showDeposit && (
         <DepositModal
           onClose={() => setShowDeposit(false)}
-          onSubmit={deposit}
+          onSubmit={handleDeposit}
           loading={loading}
+          tokenMint={vault.tokenMint}
         />
       )}
       {showTransfer && (
         <TransferModal
           onClose={() => setShowTransfer(false)}
-          onSubmit={transfer}
+          onSubmit={handleTransfer}
           loading={loading}
         />
       )}
       {showWhitelist && vaultPda && (
         <WhitelistManager
           onClose={() => setShowWhitelist(false)}
-          onAdd={addToWhitelist}
-          onRemove={removeFromWhitelist}
+          onAdd={handleWhitelistAdd}
+          onRemove={handleWhitelistRemove}
           loading={loading}
         />
       )}
@@ -332,6 +382,24 @@ export default function VaultDashboard() {
           </div>
         </div>
       )}
+
+      {/* Toast notifications */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className="px-5 py-3 rounded-xl text-sm font-semibold shadow-lg animate-[slideIn_0.3s_ease-out]"
+            style={{
+              background: toast.type === "success" ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+              color: toast.type === "success" ? "#4ade80" : "#f87171",
+              border: `1px solid ${toast.type === "success" ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
+              backdropFilter: "blur(12px)",
+            }}
+          >
+            {toast.type === "success" ? "\u2713" : "\u2717"} {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

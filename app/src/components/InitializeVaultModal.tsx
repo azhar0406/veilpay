@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { USDC_MINT, USDT_MINT, USDG_MINT } from "@/lib/anchor";
+import { USDC_MINT, USDT_MINT } from "@/lib/anchor";
 
 interface Props {
   onClose: () => void;
@@ -14,8 +14,8 @@ interface Props {
 export default function InitializeVaultModal({ onClose, onSubmit, loading }: Props) {
   const { publicKey } = useWallet();
   const [auditor, setAuditor] = useState("");
-  const [spendingLimit, setSpendingLimit] = useState("1000000");
-  const [selectedMint, setSelectedMint] = useState<"usdc" | "usdt" | "usdg">("usdg");
+  const [spendingLimit, setSpendingLimit] = useState("1000");
+  const [selectedMint, setSelectedMint] = useState<"usdc" | "usdt">("usdc");
   const [localError, setLocalError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,8 +32,9 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
     }
 
     try {
-      const mint = selectedMint === "usdc" ? USDC_MINT : selectedMint === "usdt" ? USDT_MINT : USDG_MINT;
-      await onSubmit(auditor, Number(spendingLimit), mint);
+      const mint = selectedMint === "usdc" ? USDC_MINT : USDT_MINT;
+      // Convert USD amount to raw units (6 decimals for USDC/USDT)
+      await onSubmit(auditor, Number(spendingLimit) * 1_000_000, mint);
       onClose();
     } catch (err: unknown) {
       setLocalError(err instanceof Error ? err.message : "Transaction failed");
@@ -110,7 +111,6 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
             </label>
             <div className="flex gap-2">
               {([
-                { key: "usdg" as const, label: "USDG", color: "#8b5cf6" },
                 { key: "usdc" as const, label: "USDC", color: "#2775ca" },
                 { key: "usdt" as const, label: "USDT", color: "#26a17b" },
               ]).map((t) => (
@@ -144,7 +144,7 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
                 type="number"
                 value={spendingLimit}
                 onChange={(e) => setSpendingLimit(e.target.value)}
-                placeholder="1000000"
+                placeholder="1000"
                 min="1"
                 className="w-full rounded-xl px-4 py-3 text-sm font-mono text-white focus:outline-none transition-colors"
                 style={{
@@ -156,7 +156,7 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold"
                 style={{ color: "var(--muted)" }}
               >
-                UNITS
+                {selectedMint === "usdc" ? "USDC" : "USDT"}
               </span>
             </div>
             <p style={{ color: "var(--muted)", fontSize: "12px", marginTop: "6px", lineHeight: "1.5" }}>
@@ -167,10 +167,11 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
             {/* Quick presets */}
             <div className="flex gap-2 mt-3">
               {[
-                { label: "100K", value: "100000" },
-                { label: "1M", value: "1000000" },
-                { label: "10M", value: "10000000" },
-                { label: "100M", value: "100000000" },
+                { label: "$1", value: "1" },
+                { label: "$10", value: "10" },
+                { label: "$100", value: "100" },
+                { label: "$1,000", value: "1000" },
+                { label: "$10,000", value: "10000" },
               ].map((preset) => (
                 <button
                   key={preset.value}

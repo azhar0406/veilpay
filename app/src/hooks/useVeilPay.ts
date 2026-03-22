@@ -19,6 +19,11 @@ import { encryptAmount } from "@/lib/inco";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+function isUserRejection(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("User rejected") || msg.includes("user rejected") || msg.includes("Transaction cancelled");
+}
+
 export interface VaultData {
   authority: PublicKey;
   auditor: PublicKey;
@@ -53,7 +58,7 @@ function getProgram(wallet: any, connection: any): Program | null {
 // The authority address that created the vault — hardcoded for this hackathon demo
 // so that auditor and other wallets can also find the vault.
 const VAULT_AUTHORITY = new PublicKey(
-  "3JQwsFy8RFmjF4CkzDZV5c3zizrGdvdz5pQV78ziGQeq"
+  "EHq49A6KfUccJJJHZxBiu8TavDgAUmzyFK7xe4YduCWJ"
 );
 
 export function useVeilPay() {
@@ -167,9 +172,10 @@ export function useVeilPay() {
 
         setError(null);
       } catch (err: unknown) {
-        const msg =
-          err instanceof Error ? err.message : "Failed to add to whitelist";
+        if (isUserRejection(err)) { setLoading(false); return; }
+        const msg = err instanceof Error ? err.message : "Failed to add to whitelist";
         setError(msg);
+        throw err;
       } finally {
         setLoading(false);
       }
@@ -202,11 +208,10 @@ export function useVeilPay() {
           })
           .rpc();
       } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "Failed to remove from whitelist";
+        if (isUserRejection(err)) { setLoading(false); return; }
+        const msg = err instanceof Error ? err.message : "Failed to remove from whitelist";
         setError(msg);
+        throw err;
       } finally {
         setLoading(false);
       }
@@ -253,8 +258,10 @@ export function useVeilPay() {
 
         await fetchVault();
       } catch (err: unknown) {
+        if (isUserRejection(err)) { setLoading(false); return; }
         const msg = err instanceof Error ? err.message : "Deposit failed";
         setError(msg);
+        throw err;
       } finally {
         setLoading(false);
       }
@@ -306,8 +313,10 @@ export function useVeilPay() {
 
         await fetchVault();
       } catch (err: unknown) {
+        if (isUserRejection(err)) { setLoading(false); return; }
         const msg = err instanceof Error ? err.message : "Transfer failed";
         setError(msg);
+        throw err;
       } finally {
         setLoading(false);
       }
@@ -318,7 +327,7 @@ export function useVeilPay() {
   // Freeze / Unfreeze
   const toggleFreeze = useCallback(async () => {
     const program = getProgram(wallet, connection);
-    if (!program || !wallet || !vaultPda || !vault) {
+    if (!program || !wallet || !vault) {
       setError("Wallet not connected or vault not found");
       return;
     }
@@ -327,24 +336,30 @@ export function useVeilPay() {
     setError(null);
 
     try {
+      // Always derive PDA fresh from the connected wallet to avoid stale state
+      const [freshVaultPda] = getVaultPda(wallet.publicKey);
+      console.log("DEBUG freeze - wallet:", wallet.publicKey.toBase58());
+      console.log("DEBUG freeze - freshVaultPda:", freshVaultPda.toBase58());
+      console.log("DEBUG freeze - vault.authority:", vault.authority.toBase58());
       const method = vault.isFrozen ? "unfreezeVault" : "freezeVault";
       await (program.methods as any)
         [method]()
         .accounts({
-          vaultConfig: vaultPda,
+          vaultConfig: freshVaultPda,
           authority: wallet.publicKey,
         })
         .rpc();
 
       await fetchVault();
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Freeze/unfreeze failed";
+      if (isUserRejection(err)) { setLoading(false); return; }
+      const msg = err instanceof Error ? err.message : "Freeze/unfreeze failed";
       setError(msg);
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, [wallet, connection, vaultPda, vault, fetchVault]);
+  }, [wallet, connection, vault, fetchVault]);
 
   // Fetch payment records
   const fetchPayments = useCallback(async (): Promise<PaymentData[]> => {

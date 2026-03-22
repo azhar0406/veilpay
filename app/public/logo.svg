@@ -1,6 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Outer glow -->
+  <circle cx="256" cy="256" r="220" fill="url(#glowGrad)" opacity="0.5"/>
+
   <!-- Outer sun rays -->
-  <g stroke="url(#rayGrad)" stroke-width="5" stroke-linecap="round" opacity="0.7">
+  <g stroke="url(#rayGrad)" stroke-width="9" stroke-linecap="round" opacity="1">
     <line x1="256" y1="52" x2="256" y2="16"/>
     <line x1="256" y1="496" x2="256" y2="460"/>
     <line x1="52" y1="256" x2="16" y2="256"/>
@@ -19,36 +22,46 @@
     <line x1="440" y1="336" x2="474" y2="350"/>
   </g>
 
-  <!-- Sun circle — muted warm glow -->
-  <circle cx="256" cy="256" r="148" fill="url(#sunGrad)" opacity="0.08"/>
-  <circle cx="256" cy="256" r="148" stroke="url(#sunGrad)" stroke-width="3" fill="none" opacity="0.6"/>
+  <!-- Sun circle — bright fill -->
+  <circle cx="256" cy="256" r="148" fill="url(#sunGrad)" opacity="0.5"/>
+  <circle cx="256" cy="256" r="148" stroke="url(#brightStroke)" stroke-width="5" fill="none" opacity="1"/>
 
   <!-- Inner glow ring -->
-  <circle cx="256" cy="256" r="120" stroke="url(#sunGrad)" stroke-width="1.5" fill="none" opacity="0.25"/>
+  <circle cx="256" cy="256" r="120" stroke="url(#brightStroke)" stroke-width="2.5" fill="none" opacity="0.9"/>
 
   <!-- Lock body -->
-  <rect x="212" y="262" width="88" height="72" rx="12" fill="url(#lockGrad)" stroke="url(#sunGrad)" stroke-width="2.5" stroke-opacity="0.7"/>
+  <rect x="212" y="262" width="88" height="72" rx="12" fill="url(#lockGrad)" stroke="url(#brightStroke)" stroke-width="3.5" stroke-opacity="1"/>
 
   <!-- Lock shackle -->
-  <path d="M232 262 V234 C232 210 280 210 280 234 V262" fill="none" stroke="url(#sunGrad)" stroke-width="7" stroke-linecap="round" stroke-opacity="0.7"/>
+  <path d="M232 262 V234 C232 210 280 210 280 234 V262" fill="none" stroke="url(#brightStroke)" stroke-width="9" stroke-linecap="round" stroke-opacity="1"/>
 
   <!-- Keyhole -->
-  <circle cx="256" cy="290" r="9" fill="url(#sunGrad)" opacity="0.8"/>
-  <rect x="253.5" y="296" width="5" height="16" rx="2.5" fill="url(#sunGrad)" opacity="0.8"/>
+  <circle cx="256" cy="290" r="10" fill="#FDE68A" opacity="1"/>
+  <rect x="253" y="297" width="6" height="16" rx="3" fill="#FDE68A" opacity="1"/>
 
   <defs>
     <linearGradient id="sunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#B45309"/>
-      <stop offset="50%" stop-color="#C2410C"/>
-      <stop offset="100%" stop-color="#991B1B"/>
+      <stop offset="0%" stop-color="#FDE68A"/>
+      <stop offset="50%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#FB923C"/>
+    </linearGradient>
+    <linearGradient id="brightStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7"/>
+      <stop offset="50%" stop-color="#FDE68A"/>
+      <stop offset="100%" stop-color="#FBBF24"/>
     </linearGradient>
     <linearGradient id="lockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1E1B4B" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.95"/>
+      <stop offset="0%" stop-color="#1E1B4B" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.85"/>
     </linearGradient>
     <linearGradient id="rayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#92400E"/>
-      <stop offset="100%" stop-color="#B45309"/>
+      <stop offset="0%" stop-color="#FEF3C7"/>
+      <stop offset="100%" stop-color="#FDE68A"/>
     </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FDE68A" stop-opacity="0.7"/>
+      <stop offset="60%" stop-color="#FBBF24" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#FBBF24" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 </svg>

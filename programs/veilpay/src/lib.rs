@@ -178,7 +178,7 @@ pub mod veilpay {
 
         // Transfer real SPL tokens from vault to recipient using PDA signer
         let decimals = ctx.accounts.token_mint.decimals;
-        let seeds: &[&[u8]] = &[b"vault_config", authority_key.as_ref(), &[bump]];
+        let seeds: &[&[u8]] = &[b"vault_v2", authority_key.as_ref(), &[bump]];
         let signer_seeds = &[seeds];
 
         let transfer_ctx = CpiContext::new_with_signer(
@@ -296,7 +296,7 @@ impl PaymentRecord { pub const LEN: usize = 8 + 32 + 32 + 32 + 16 + 8 + 8 + 1 + 
 
 #[derive(Accounts)]
 pub struct InitializeVault<'info> {
-    #[account(init, payer = authority, space = VaultConfig::LEN, seeds = [b"vault_config", authority.key().as_ref()], bump)]
+    #[account(init, payer = authority, space = VaultConfig::LEN, seeds = [b"vault_v2", authority.key().as_ref()], bump)]
     pub vault_config: Account<'info, VaultConfig>,
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -340,7 +340,7 @@ pub struct RemoveFromWhitelist<'info> {
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
-    #[account(mut, seeds = [b"vault_config", vault_config.authority.as_ref()], bump = vault_config.bump)]
+    #[account(mut, seeds = [b"vault_v2", vault_config.authority.as_ref()], bump = vault_config.bump)]
     pub vault_config: Account<'info, VaultConfig>,
     #[account(seeds = [b"whitelist", vault_config.key().as_ref(), depositor.key().as_ref()], bump = whitelist.bump)]
     pub whitelist: Account<'info, Whitelist>,
@@ -361,7 +361,7 @@ pub struct Deposit<'info> {
 
 #[derive(Accounts)]
 pub struct ConfidentialTransfer<'info> {
-    #[account(mut, seeds = [b"vault_config", vault_config.authority.as_ref()], bump = vault_config.bump)]
+    #[account(mut, seeds = [b"vault_v2", vault_config.authority.as_ref()], bump = vault_config.bump)]
     pub vault_config: Account<'info, VaultConfig>,
     #[account(seeds = [b"whitelist", vault_config.key().as_ref(), sender.key().as_ref()], bump = whitelist.bump)]
     pub whitelist: Account<'info, Whitelist>,
@@ -387,14 +387,14 @@ pub struct ConfidentialTransfer<'info> {
 
 #[derive(Accounts)]
 pub struct FreezeVault<'info> {
-    #[account(mut, has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_config", authority.key().as_ref()], bump = vault_config.bump)]
+    #[account(mut, has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_v2", authority.key().as_ref()], bump = vault_config.bump)]
     pub vault_config: Account<'info, VaultConfig>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct UnfreezeVault<'info> {
-    #[account(mut, has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_config", authority.key().as_ref()], bump = vault_config.bump)]
+    #[account(mut, has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_v2", authority.key().as_ref()], bump = vault_config.bump)]
     pub vault_config: Account<'info, VaultConfig>,
     pub authority: Signer<'info>,
 }
