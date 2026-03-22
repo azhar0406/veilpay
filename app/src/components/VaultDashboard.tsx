@@ -11,6 +11,7 @@ import TransferModal from "./TransferModal";
 import WhitelistManager from "./WhitelistManager";
 import AuditorView from "./AuditorView";
 import PaymentHistory from "./PaymentHistory";
+import USXFaucet from "./USXFaucet";
 
 export default function VaultDashboard() {
   const { connected, publicKey } = useWallet();
@@ -42,15 +43,7 @@ export default function VaultDashboard() {
       <header style={{ background: "var(--card)", borderBottom: "1px solid var(--card-border)" }}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #3b82f6, #8b5cf6)" }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </div>
+            <img src="/logo.svg" alt="VeilPay" className="w-10 h-10" />
             <div>
               <h1 className="text-xl font-bold text-white tracking-tight">VeilPay</h1>
               <p style={{ color: "var(--muted)", fontSize: "12px", lineHeight: "1.2" }}>
@@ -72,18 +65,7 @@ export default function VaultDashboard() {
         {!connected ? (
           /* ===== LANDING / NOT CONNECTED ===== */
           <div className="flex flex-col items-center justify-center min-h-[65vh] gap-8">
-            <div
-              className="w-24 h-24 rounded-3xl flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15))",
-                border: "1px solid rgba(59,130,246,0.2)",
-              }}
-            >
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </div>
+            <img src="/logo.svg" alt="VeilPay" className="w-24 h-24" />
 
             <div className="text-center max-w-lg">
               <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">
@@ -122,19 +104,7 @@ export default function VaultDashboard() {
         ) : !vault ? (
           /* ===== CONNECTED BUT NO VAULT ===== */
           <div className="flex flex-col items-center justify-center min-h-[55vh] gap-8">
-            <div
-              className="w-20 h-20 rounded-2xl flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.12))",
-                border: "1px solid rgba(59,130,246,0.2)",
-              }}
-            >
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                <line x1="12" y1="15" x2="12" y2="19" />
-              </svg>
-            </div>
+            <img src="/logo.svg" alt="VeilPay" className="w-20 h-20" />
 
             <div className="text-center max-w-md">
               <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">
@@ -172,6 +142,11 @@ export default function VaultDashboard() {
                 <li>Deposit encrypted amounts into the vault</li>
                 <li>Send confidential transfers to recipients</li>
               </ol>
+            </div>
+
+            {/* USX Faucet — only visible to whitelisted wallet */}
+            <div className="max-w-md w-full mt-2">
+              <USXFaucet />
             </div>
           </div>
         ) : (
@@ -290,6 +265,9 @@ export default function VaultDashboard() {
                 </button>
               ))}
             </div>
+
+            {/* USX Faucet — only visible to whitelisted wallet */}
+            <USXFaucet />
 
             {/* Auditor View */}
             {isAuditor && vault && vaultPda && (

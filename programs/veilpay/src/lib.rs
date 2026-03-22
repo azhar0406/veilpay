@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_spl::associated_token::AssociatedToken;
 use inco_lightning::cpi::accounts::{Allow, Operation};
 use inco_lightning::cpi::{allow, as_euint128, e_add, e_ge, e_select, e_sub, new_euint128};
 use inco_lightning::types::{Ebool, Euint128};
@@ -10,9 +12,7 @@ declare_id!("FVwSkmgzT1yvgJ1eWpfyXnaRnD86xfUKtBFHBLFfXkRb");
 pub mod veilpay {
     use super::*;
 
-    /// Initialize a new confidential treasury vault.
-    /// Remaining accounts (for granting decrypt access) — 4 accounts per (handle, address) pair:
-    ///   For each of 3 handles x 2 addresses = 12 remaining accounts
+    /// Initialize a new confidential treasury vault with a token mint.
     pub fn initialize_vault<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitializeVault<'info>>,
         auditor: Pubkey,
@@ -26,6 +26,7 @@ pub mod veilpay {
 
         vault.authority = ctx.accounts.authority.key();
         vault.auditor = auditor;
+        vault.token_mint = ctx.accounts.token_mint.key();
         vault.is_frozen = false;
         vault.bump = ctx.bumps.vault_config;
         vault.current_epoch = Clock::get()?.epoch;
@@ -59,7 +60,7 @@ pub mod veilpay {
             }
         }
 
-        emit!(VaultInitialized { vault: vault.key(), authority: vault.authority, auditor: vault.auditor });
+        emit!(VaultInitialized { vault: vault.key(), authority: vault.authority, auditor: vault.auditor, token_mint: vault.token_mint });
         Ok(())
     }
 
@@ -78,12 +79,26 @@ pub mod veilpay {
         Ok(())
     }
 
-    /// Deposit. remaining_accounts: 4 accounts (allowance+addr for authority, allowance+addr for auditor)
-    pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, ciphertext: Vec<u8>, input_type: u8) -> Result<()> {
+    /// Deposit: transfers SPL tokens from depositor to vault, then updates encrypted balance.
+    pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, ciphertext: Vec<u8>, input_type: u8, amount: u64) -> Result<()> {
         let vault = &mut ctx.accounts.vault_config;
         require!(!vault.is_frozen, VeilPayError::VaultFrozen);
         require!(ctx.accounts.whitelist.is_active, VeilPayError::NotWhitelisted);
 
+        // Transfer SPL tokens from depositor to vault token account
+        let decimals = ctx.accounts.token_mint.decimals;
+        let transfer_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.depositor_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
+                to: ctx.accounts.vault_token_account.to_account_info(),
+                authority: ctx.accounts.depositor.to_account_info(),
+            },
+        );
+        token_interface::transfer_checked(transfer_ctx, amount, decimals)?;
+
+        // FHE: encrypt the amount and add to encrypted balance
         let inco = ctx.accounts.inco_lightning_program.to_account_info();
         let signer = ctx.accounts.depositor.to_account_info();
         let sys = ctx.accounts.system_program.to_account_info();
@@ -108,12 +123,17 @@ pub mod veilpay {
             }
         }
 
-        emit!(ConfidentialDeposit { vault: vault.key(), depositor: ctx.accounts.depositor.key(), timestamp: Clock::get()?.unix_timestamp });
+        emit!(ConfidentialDeposit { vault: vault.key(), depositor: ctx.accounts.depositor.key(), amount, timestamp: Clock::get()?.unix_timestamp });
         Ok(())
     }
 
-    /// Confidential transfer. remaining_accounts: 8 accounts (for balance + spent handles x 2 addresses)
-    pub fn confidential_transfer<'info>(ctx: Context<'_, '_, 'info, 'info, ConfidentialTransfer<'info>>, amount_ciphertext: Vec<u8>, input_type: u8) -> Result<()> {
+    /// Confidential transfer: checks FHE spending limits, then transfers real SPL tokens.
+    pub fn confidential_transfer<'info>(ctx: Context<'_, '_, 'info, 'info, ConfidentialTransfer<'info>>, amount_ciphertext: Vec<u8>, input_type: u8, amount: u64) -> Result<()> {
+        // Extract PDA signer info and account info before mutable borrow
+        let authority_key = ctx.accounts.vault_config.authority;
+        let bump = ctx.accounts.vault_config.bump;
+        let vault_account_info = ctx.accounts.vault_config.to_account_info();
+
         let vault = &mut ctx.accounts.vault_config;
         require!(!vault.is_frozen, VeilPayError::VaultFrozen);
         let whitelist = &ctx.accounts.whitelist;
@@ -156,6 +176,23 @@ pub mod veilpay {
         let nonce = vault.payment_nonce;
         vault.payment_nonce = vault.payment_nonce.checked_add(1).unwrap();
 
+        // Transfer real SPL tokens from vault to recipient using PDA signer
+        let decimals = ctx.accounts.token_mint.decimals;
+        let seeds: &[&[u8]] = &[b"vault_config", authority_key.as_ref(), &[bump]];
+        let signer_seeds = &[seeds];
+
+        let transfer_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.vault_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
+                to: ctx.accounts.recipient_token_account.to_account_info(),
+                authority: vault_account_info,
+            },
+            signer_seeds,
+        );
+        token_interface::transfer_checked(transfer_ctx, amount, decimals)?;
+
         let payment = &mut ctx.accounts.payment_record;
         payment.vault = vault.key();
         payment.sender = ctx.accounts.sender.key();
@@ -174,7 +211,7 @@ pub mod veilpay {
                     let base = hi * 4 + ai * 2;
                     let cpi_ctx = CpiContext::new(inco.clone(), Allow {
                         allowance_account: ra[base].clone(),
-                        signer: signer.clone(),
+                        signer: ctx.accounts.sender.to_account_info(),
                         allowed_address: ra[base + 1].clone(),
                         system_program: sys.clone(),
                     });
@@ -183,7 +220,7 @@ pub mod veilpay {
             }
         }
 
-        emit!(ConfidentialTransferEvent { vault: vault.key(), sender: payment.sender, recipient: payment.recipient, nonce, timestamp: payment.timestamp });
+        emit!(ConfidentialTransferEvent { vault: vault.key(), sender: payment.sender, recipient: payment.recipient, nonce, amount, timestamp: payment.timestamp });
         Ok(())
     }
 
@@ -220,6 +257,7 @@ pub mod veilpay {
 pub struct VaultConfig {
     pub authority: Pubkey,
     pub auditor: Pubkey,
+    pub token_mint: Pubkey,
     pub encrypted_balance: Euint128,
     pub encrypted_spending_limit: Euint128,
     pub encrypted_spent_this_epoch: Euint128,
@@ -228,7 +266,7 @@ pub struct VaultConfig {
     pub is_frozen: bool,
     pub bump: u8,
 }
-impl VaultConfig { pub const LEN: usize = 8 + 32 + 32 + 16 + 16 + 16 + 8 + 8 + 1 + 1 + 64; }
+impl VaultConfig { pub const LEN: usize = 8 + 32 + 32 + 32 + 16 + 16 + 16 + 8 + 8 + 1 + 1 + 64; }
 
 #[account]
 pub struct Whitelist {
@@ -262,9 +300,19 @@ pub struct InitializeVault<'info> {
     pub vault_config: Account<'info, VaultConfig>,
     #[account(mut)]
     pub authority: Signer<'info>,
+    pub token_mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        init,
+        payer = authority,
+        associated_token::mint = token_mint,
+        associated_token::authority = vault_config,
+    )]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
     /// CHECK: Inco Lightning program
     #[account(address = INCO_LIGHTNING_ID)]
     pub inco_lightning_program: AccountInfo<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
@@ -298,6 +346,13 @@ pub struct Deposit<'info> {
     pub whitelist: Account<'info, Whitelist>,
     #[account(mut)]
     pub depositor: Signer<'info>,
+    #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = depositor)]
+    pub depositor_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = vault_config)]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(address = vault_config.token_mint)]
+    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub token_program: Interface<'info, TokenInterface>,
     /// CHECK: Inco Lightning program
     #[account(address = INCO_LIGHTNING_ID)]
     pub inco_lightning_program: AccountInfo<'info>,
@@ -316,6 +371,14 @@ pub struct ConfidentialTransfer<'info> {
     pub sender: Signer<'info>,
     /// CHECK: Recipient wallet
     pub recipient: AccountInfo<'info>,
+    #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = vault_config)]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+    /// CHECK: Recipient token account — validated by token program during transfer
+    #[account(mut)]
+    pub recipient_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(address = vault_config.token_mint)]
+    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub token_program: Interface<'info, TokenInterface>,
     /// CHECK: Inco Lightning program
     #[account(address = INCO_LIGHTNING_ID)]
     pub inco_lightning_program: AccountInfo<'info>,
@@ -352,11 +415,11 @@ pub struct ResetEpoch<'info> {
 // ============================================================
 
 #[event]
-pub struct VaultInitialized { pub vault: Pubkey, pub authority: Pubkey, pub auditor: Pubkey }
+pub struct VaultInitialized { pub vault: Pubkey, pub authority: Pubkey, pub auditor: Pubkey, pub token_mint: Pubkey }
 #[event]
-pub struct ConfidentialDeposit { pub vault: Pubkey, pub depositor: Pubkey, pub timestamp: i64 }
+pub struct ConfidentialDeposit { pub vault: Pubkey, pub depositor: Pubkey, pub amount: u64, pub timestamp: i64 }
 #[event]
-pub struct ConfidentialTransferEvent { pub vault: Pubkey, pub sender: Pubkey, pub recipient: Pubkey, pub nonce: u64, pub timestamp: i64 }
+pub struct ConfidentialTransferEvent { pub vault: Pubkey, pub sender: Pubkey, pub recipient: Pubkey, pub nonce: u64, pub amount: u64, pub timestamp: i64 }
 #[event]
 pub struct VaultFrozen { pub vault: Pubkey, pub frozen_by: Pubkey }
 

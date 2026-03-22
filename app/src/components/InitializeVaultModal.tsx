@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { USDC_MINT, USDT_MINT, USDG_MINT } from "@/lib/anchor";
 
 interface Props {
   onClose: () => void;
-  onSubmit: (auditor: string, spendingLimit: number) => Promise<void>;
+  onSubmit: (auditor: string, spendingLimit: number, tokenMint?: PublicKey) => Promise<void>;
   loading: boolean;
 }
 
@@ -13,6 +15,7 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
   const { publicKey } = useWallet();
   const [auditor, setAuditor] = useState("");
   const [spendingLimit, setSpendingLimit] = useState("1000000");
+  const [selectedMint, setSelectedMint] = useState<"usdc" | "usdt" | "usdg">("usdg");
   const [localError, setLocalError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,7 +32,8 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
     }
 
     try {
-      await onSubmit(auditor, Number(spendingLimit));
+      const mint = selectedMint === "usdc" ? USDC_MINT : selectedMint === "usdt" ? USDT_MINT : USDG_MINT;
+      await onSubmit(auditor, Number(spendingLimit), mint);
       onClose();
     } catch (err: unknown) {
       setLocalError(err instanceof Error ? err.message : "Transaction failed");
@@ -96,6 +100,37 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
             <p style={{ color: "var(--muted)", fontSize: "12px", marginTop: "6px", lineHeight: "1.5" }}>
               The auditor can decrypt vault balances and payment amounts for compliance.
               For testing, you can use your own wallet address.
+            </p>
+          </div>
+
+          {/* Token Mint Selection */}
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">
+              Vault Token
+            </label>
+            <div className="flex gap-2">
+              {([
+                { key: "usdg" as const, label: "USDG", color: "#8b5cf6" },
+                { key: "usdc" as const, label: "USDC", color: "#2775ca" },
+                { key: "usdt" as const, label: "USDT", color: "#26a17b" },
+              ]).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setSelectedMint(t.key)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: selectedMint === t.key ? `${t.color}20` : "var(--surface)",
+                    border: `1px solid ${selectedMint === t.key ? `${t.color}60` : "var(--card-border)"}`,
+                    color: selectedMint === t.key ? t.color : "var(--muted-light)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <p style={{ color: "var(--muted)", fontSize: "12px", marginTop: "6px" }}>
+              The stablecoin this vault will hold and transfer.
             </p>
           </div>
 

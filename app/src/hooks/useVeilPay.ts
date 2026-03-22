@@ -6,9 +6,13 @@ import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import {
   INCO_LIGHTNING_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  USDC_MINT,
   getVaultPda,
   getWhitelistPda,
   getPaymentPda,
+  getAssociatedTokenAddress,
+  getTokenProgramId,
 } from "@/lib/anchor";
 import { IDL } from "@/lib/idl";
 import { encryptAmount } from "@/lib/inco";
@@ -18,6 +22,7 @@ import { encryptAmount } from "@/lib/inco";
 export interface VaultData {
   authority: PublicKey;
   auditor: PublicKey;
+  tokenMint: PublicKey;
   encryptedBalance: any;
   encryptedSpendingLimit: any;
   encryptedSpentThisEpoch: any;
@@ -59,13 +64,12 @@ export function useVeilPay() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch vault data — always look up the vault created by the known authority
+  // Fetch vault data
   const fetchVault = useCallback(async () => {
     if (!wallet) return;
     const program = getProgram(wallet, connection);
     if (!program) return;
 
-    // Try connected wallet's vault first, then fall back to known authority
     const [ownPda] = getVaultPda(wallet.publicKey);
     const [authorityPda] = getVaultPda(VAULT_AUTHORITY);
 
@@ -88,9 +92,9 @@ export function useVeilPay() {
     fetchVault();
   }, [fetchVault]);
 
-  // Initialize vault
+  // Initialize vault with a token mint
   const initializeVault = useCallback(
-    async (auditorAddress: string, spendingLimit: number) => {
+    async (auditorAddress: string, spendingLimit: number, tokenMint?: PublicKey) => {
       const program = getProgram(wallet, connection);
       if (!program || !wallet) {
         setError("Wallet not connected");
@@ -102,7 +106,9 @@ export function useVeilPay() {
 
       try {
         const auditor = new PublicKey(auditorAddress);
+        const mint = tokenMint || USDC_MINT;
         const [vPda] = getVaultPda(wallet.publicKey);
+        const vaultTokenAccount = getAssociatedTokenAddress(mint, vPda);
         const { ciphertext, inputType } = await encryptAmount(
           BigInt(spendingLimit)
         );
@@ -112,7 +118,11 @@ export function useVeilPay() {
           .accounts({
             vaultConfig: vPda,
             authority: wallet.publicKey,
+            tokenMint: mint,
+            vaultTokenAccount,
             incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
+            tokenProgram: getTokenProgramId(mint),
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
           })
           .rpc();
@@ -204,11 +214,11 @@ export function useVeilPay() {
     [wallet, connection, vaultPda]
   );
 
-  // Deposit
+  // Deposit — transfers real tokens + updates encrypted balance
   const deposit = useCallback(
     async (amount: number) => {
       const program = getProgram(wallet, connection);
-      if (!program || !wallet || !vaultPda) {
+      if (!program || !wallet || !vaultPda || !vault) {
         setError("Wallet not connected or vault not found");
         return;
       }
@@ -217,15 +227,25 @@ export function useVeilPay() {
       setError(null);
 
       try {
+        const mint = vault.tokenMint;
         const [whitelistPda] = getWhitelistPda(vaultPda, wallet.publicKey);
+        const depositorTokenAccount = getAssociatedTokenAddress(mint, wallet.publicKey);
+        const vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPda);
         const { ciphertext, inputType } = await encryptAmount(BigInt(amount));
 
+        // amount in token smallest unit (assuming 6 decimals for USDC/USDT)
+        const tokenAmount = new BN(amount).mul(new BN(10).pow(new BN(6)));
+
         await (program.methods as any)
-          .deposit(Buffer.from(ciphertext), inputType)
+          .deposit(Buffer.from(ciphertext), inputType, tokenAmount)
           .accounts({
             vaultConfig: vaultPda,
             whitelist: whitelistPda,
             depositor: wallet.publicKey,
+            depositorTokenAccount,
+            vaultTokenAccount,
+            tokenMint: mint,
+            tokenProgram: getTokenProgramId(mint),
             incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
           })
@@ -239,10 +259,10 @@ export function useVeilPay() {
         setLoading(false);
       }
     },
-    [wallet, connection, vaultPda, fetchVault]
+    [wallet, connection, vaultPda, vault, fetchVault]
   );
 
-  // Confidential transfer
+  // Confidential transfer — FHE checks + real token transfer
   const transfer = useCallback(
     async (recipientAddress: string, amount: number) => {
       const program = getProgram(wallet, connection);
@@ -256,19 +276,29 @@ export function useVeilPay() {
 
       try {
         const recipient = new PublicKey(recipientAddress);
+        const mint = vault.tokenMint;
         const [whitelistPda] = getWhitelistPda(vaultPda, wallet.publicKey);
         const nonce = vault.paymentNonce.toNumber();
         const [paymentPda] = getPaymentPda(vaultPda, nonce);
+        const vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPda);
+        const recipientTokenAccount = getAssociatedTokenAddress(mint, recipient);
         const { ciphertext, inputType } = await encryptAmount(BigInt(amount));
 
+        // amount in token smallest unit (assuming 6 decimals for USDC/USDT)
+        const tokenAmount = new BN(amount).mul(new BN(10).pow(new BN(6)));
+
         await (program.methods as any)
-          .confidentialTransfer(Buffer.from(ciphertext), inputType)
+          .confidentialTransfer(Buffer.from(ciphertext), inputType, tokenAmount)
           .accounts({
             vaultConfig: vaultPda,
             whitelist: whitelistPda,
             paymentRecord: paymentPda,
             sender: wallet.publicKey,
             recipient,
+            vaultTokenAccount,
+            recipientTokenAccount,
+            tokenMint: mint,
+            tokenProgram: getTokenProgramId(mint),
             incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
           })
