@@ -59,12 +59,6 @@ function getProgram(wallet: any, connection: any): Program | null {
   return new Program(IDL as any, provider);
 }
 
-// The authority address that created the vault — hardcoded for this hackathon demo
-// so that auditor and other wallets can also find the vault.
-const VAULT_AUTHORITY = new PublicKey(
-  "EzYPTnGCajb2bxGeKYzooyiFP7JLemWLNcf5JZdztzSy"
-);
-
 export function useVeilPay() {
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
@@ -73,26 +67,69 @@ export function useVeilPay() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch vault data
+  // Fetch vault data — auto-detect based on connected wallet
+  // 1. Check if wallet owns a vault (is authority)
+  // 2. Search all vaults to find one where wallet is auditor, whitelisted, or payment recipient
   const fetchVault = useCallback(async () => {
     if (!wallet) return;
     const program = getProgram(wallet, connection);
     if (!program) return;
 
+    // First: check if connected wallet is the authority of a vault
     const [ownPda] = getVaultPda(wallet.publicKey);
-    const [authorityPda] = getVaultPda(VAULT_AUTHORITY);
-
-    for (const pda of [ownPda, authorityPda]) {
-      try {
-        const data = await (program.account as any).vaultConfig.fetch(pda);
-        setVault(data as VaultData);
-        setVaultPda(pda);
-        setError(null);
-        return;
-      } catch {
-        // Try next
-      }
+    try {
+      const data = await (program.account as any).vaultConfig.fetch(ownPda);
+      setVault(data as VaultData);
+      setVaultPda(ownPda);
+      setError(null);
+      return;
+    } catch {
+      // Not the authority — search all vaults
     }
+
+    // Second: fetch all vaults and find one where this wallet is auditor or whitelisted
+    try {
+      const allVaults = await (program.account as any).vaultConfig.all();
+      for (const v of allVaults) {
+        const data = v.account as VaultData;
+        // Check if wallet is auditor
+        if (data.auditor.equals(wallet.publicKey)) {
+          setVault(data);
+          setVaultPda(v.publicKey);
+          setError(null);
+          return;
+        }
+        // Check if wallet is whitelisted for this vault
+        const [whitelistPda] = getWhitelistPda(v.publicKey, wallet.publicKey);
+        try {
+          await (program.account as any).whitelist.fetch(whitelistPda);
+          setVault(data);
+          setVaultPda(v.publicKey);
+          setError(null);
+          return;
+        } catch {
+          // Not whitelisted for this vault
+        }
+      }
+
+      // Third: check if wallet is a recipient of any payment
+      const allPayments = await (program.account as any).paymentRecord.all();
+      for (const p of allPayments) {
+        if (p.account.recipient.equals(wallet.publicKey)) {
+          // Find the vault for this payment
+          try {
+            const data = await (program.account as any).vaultConfig.fetch(p.account.vault);
+            setVault(data as VaultData);
+            setVaultPda(p.account.vault);
+            setError(null);
+            return;
+          } catch { /* vault not found */ }
+        }
+      }
+    } catch {
+      // Search failed
+    }
+
     setVault(null);
     setVaultPda(null);
   }, [wallet, connection]);
