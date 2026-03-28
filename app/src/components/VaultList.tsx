@@ -205,17 +205,16 @@ export default function VaultList({ vaults, onSelect, onCreate, loading }: Props
                   </div>
                 </div>
 
-                <div className="mt-4">
+                <div className="mt-3 flex items-center justify-between">
+                  {isOwn && (
+                    <span className="text-xs" style={{ color: "#FBBF24" }}>You own this vault</span>
+                  )}
                   <span
-                    className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold transition-all"
+                    className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold"
                     style={{
-                      background: isOwn
-                        ? "linear-gradient(135deg, #F59E0B, #D97706)"
-                        : "linear-gradient(135deg, #3b82f6, #2563eb)",
-                      color: "#fff",
-                      boxShadow: isOwn
-                        ? "0 2px 12px rgba(245,158,11,0.25)"
-                        : "0 2px 12px rgba(59,130,246,0.2)",
+                      background: isOwn ? "rgba(251,191,36,0.15)" : "rgba(59,130,246,0.15)",
+                      color: isOwn ? "#FBBF24" : "#60a5fa",
+                      border: `1px solid ${isOwn ? "rgba(251,191,36,0.3)" : "rgba(59,130,246,0.3)"}`,
                     }}
                   >
                     Enter Vault &rarr;
