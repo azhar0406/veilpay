@@ -11,6 +11,9 @@ app/out/
 .env.local
 .env.*.local
 
+# Claude Code
+.claude/
+
 # IDE
 .vscode/
 .idea/

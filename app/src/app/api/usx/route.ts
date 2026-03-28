@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const USX_API_URL = "https://instructions.solstice.finance/v1/instructions";
-const USX_API_KEY = "5aJUZP9ebCApZm%2BVMIvGQLZlRr9E";
+const USX_API_KEY = process.env.USX_API_KEY || "";
 
 export async function POST(req: NextRequest) {
   try {
