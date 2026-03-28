@@ -599,6 +599,54 @@
       ]
     },
     {
+      "name": "grant_decrypt_access",
+      "docs": [
+        "Grant decrypt access for all vault handles to authority and auditor."
+      ],
+      "discriminator": [182, 222, 90, 37, 106, 145, 77, 174],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": ["vault_config"]
+        },
+        {
+          "name": "inco_lightning_program",
+          "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "freeze_vault",
       "discriminator": [
         144,

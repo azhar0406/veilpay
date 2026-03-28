@@ -33,6 +33,7 @@ export default function VaultDashboard() {
     addToWhitelist,
     removeFromWhitelist,
     fetchPayments,
+    grantDecryptAccess,
   } = useVeilPay();
 
   const [showInit, setShowInit] = useState(false);
@@ -113,6 +114,13 @@ export default function VaultDashboard() {
       showToast(vault?.isFrozen ? "Vault unfrozen" : "Vault frozen", "success");
     } catch { showToast("Freeze/unfreeze failed", "error"); }
   }, [toggleFreeze, vault, showToast]);
+
+  const handleGrantAccess = useCallback(async () => {
+    try {
+      await grantDecryptAccess();
+      showToast("Decrypt access granted to authority & auditor", "success");
+    } catch { showToast("Grant access failed", "error"); }
+  }, [grantDecryptAccess, showToast]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
@@ -354,7 +362,10 @@ export default function VaultDashboard() {
               {[
                 { icon: "&#8595;", label: "Deposit", onClick: () => setShowDeposit(true), disabled: loading || vault.isFrozen },
                 { icon: "&#8594;", label: "Transfer", onClick: () => setShowTransfer(true), disabled: loading || vault.isFrozen },
-                ...(isAuthority ? [{ icon: "&#128101;", label: "Whitelist", onClick: () => setShowWhitelist(true), disabled: false }] : []),
+                ...(isAuthority ? [
+                  { icon: "&#128101;", label: "Whitelist", onClick: () => setShowWhitelist(true), disabled: false },
+                  { icon: "&#128272;", label: "Grant Access", onClick: handleGrantAccess, disabled: loading },
+                ] : []),
                 { icon: "&#128270;", label: "Explorer", onClick: () => window.open(`https://explorer.solana.com/address/${vaultPda?.toBase58()}?cluster=devnet`, "_blank"), disabled: false },
               ].map((btn, i) => (
                 <button

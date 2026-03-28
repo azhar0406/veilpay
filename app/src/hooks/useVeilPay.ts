@@ -14,9 +14,10 @@ import {
   getPaymentPda,
   getAssociatedTokenAddress,
   getTokenProgramId,
+  getAllowancePda,
 } from "@/lib/anchor";
 import { IDL } from "@/lib/idl";
-import { encryptAmount } from "@/lib/inco";
+import { encryptAmount, extractHandle } from "@/lib/inco";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -397,6 +398,57 @@ export function useVeilPay() {
     }
   }, [wallet, connection, vaultPda]);
 
+  // Grant decrypt access to authority and auditor for all vault handles
+  const grantDecryptAccess = useCallback(async () => {
+    const program = getProgram(wallet, connection);
+    if (!program || !wallet || !vaultPda || !vault) {
+      setError("Wallet not connected or vault not found");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [freshVaultPda] = getVaultPda(wallet.publicKey);
+      const handles = [
+        BigInt(extractHandle(vault.encryptedBalance)),
+        BigInt(extractHandle(vault.encryptedSpendingLimit)),
+        BigInt(extractHandle(vault.encryptedSpentThisEpoch)),
+      ];
+      const addrs = [vault.authority, vault.auditor];
+
+      // Build remaining accounts: for each handle × each address, we need [allowancePda, allowedAddress]
+      const remainingAccounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
+      for (const h of handles) {
+        for (const addr of addrs) {
+          const [allowancePda] = getAllowancePda(h, addr);
+          remainingAccounts.push({ pubkey: allowancePda, isSigner: false, isWritable: true });
+          remainingAccounts.push({ pubkey: addr, isSigner: false, isWritable: false });
+        }
+      }
+
+      await (program.methods as any)
+        .grantDecryptAccess()
+        .accounts({
+          vaultConfig: freshVaultPda,
+          authority: wallet.publicKey,
+          incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts(remainingAccounts)
+        .rpc();
+
+    } catch (err: unknown) {
+      if (isUserRejection(err)) { setLoading(false); return; }
+      const msg = err instanceof Error ? err.message : "Grant access failed";
+      setError(msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [wallet, connection, vaultPda, vault]);
+
   return {
     wallet,
     vault,
@@ -411,5 +463,6 @@ export function useVeilPay() {
     toggleFreeze,
     fetchPayments,
     fetchVault,
+    grantDecryptAccess,
   };
 }

@@ -235,6 +235,35 @@ pub mod veilpay {
         Ok(())
     }
 
+    /// Grant decrypt access for all vault handles to authority and auditor.
+    /// Can be called anytime after vault creation to fix missing allow() permissions.
+    pub fn grant_decrypt_access<'info>(ctx: Context<'_, '_, 'info, 'info, GrantDecryptAccess<'info>>) -> Result<()> {
+        let vault = &ctx.accounts.vault_config;
+        let inco = ctx.accounts.inco_lightning_program.to_account_info();
+        let signer = ctx.accounts.authority.to_account_info();
+        let sys = ctx.accounts.system_program.to_account_info();
+
+        let handles = [vault.encrypted_balance, vault.encrypted_spending_limit, vault.encrypted_spent_this_epoch];
+        let addrs = [vault.authority, vault.auditor];
+        let ra = &ctx.remaining_accounts;
+        require!(ra.len() >= 12, VeilPayError::InsufficientAccounts);
+
+        for (hi, h) in handles.iter().enumerate() {
+            for (ai, a) in addrs.iter().enumerate() {
+                let base = hi * 4 + ai * 2;
+                let cpi_ctx = CpiContext::new(inco.clone(), Allow {
+                    allowance_account: ra[base].clone(),
+                    signer: signer.clone(),
+                    allowed_address: ra[base + 1].clone(),
+                    system_program: sys.clone(),
+                });
+                allow(cpi_ctx, h.0, true, *a)?;
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn reset_epoch(ctx: Context<ResetEpoch>) -> Result<()> {
         let vault = &mut ctx.accounts.vault_config;
         let current_epoch = Clock::get()?.epoch;
@@ -400,6 +429,18 @@ pub struct UnfreezeVault<'info> {
 }
 
 #[derive(Accounts)]
+pub struct GrantDecryptAccess<'info> {
+    #[account(has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_v2", authority.key().as_ref()], bump = vault_config.bump)]
+    pub vault_config: Account<'info, VaultConfig>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// CHECK: Inco Lightning program
+    #[account(address = INCO_LIGHTNING_ID)]
+    pub inco_lightning_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct ResetEpoch<'info> {
     #[account(mut)]
     pub vault_config: Account<'info, VaultConfig>,
@@ -441,4 +482,6 @@ pub enum VeilPayError {
     Unauthorized,
     #[msg("Invalid auditor address")]
     InvalidAuditor,
+    #[msg("Not enough remaining accounts for allow() calls")]
+    InsufficientAccounts,
 }
