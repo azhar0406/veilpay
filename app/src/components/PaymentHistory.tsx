@@ -28,6 +28,12 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
     });
   }, [fetchPayments]);
 
+  // Clear revealed amounts when wallet changes
+  useEffect(() => {
+    setRevealedAmounts({});
+    setRevealingNonce(null);
+  }, [publicKey]);
+
   const handleRevealAmount = useCallback(async (nonce: string, handle: string) => {
     if (!publicKey || !signMessage) return;
     if (revealedAmounts[nonce]) {

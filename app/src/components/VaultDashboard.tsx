@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useVeilPay } from "@/hooks/useVeilPay";
@@ -44,6 +44,12 @@ export default function VaultDashboard() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
+
+  // Clear revealed values when wallet changes
+  useEffect(() => {
+    setRevealedValues({});
+    setRevealingKey(null);
+  }, [publicKey]);
 
   const showToast = useCallback((message: string, type: "success" | "error") => {
     const id = Date.now();
