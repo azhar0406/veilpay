@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { createAssociatedTokenAccountInstruction } from "@solana/spl-token";
 import {
   INCO_LIGHTNING_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -284,11 +285,26 @@ export function useVeilPay() {
       try {
         const recipient = new PublicKey(recipientAddress);
         const mint = vault.tokenMint;
+        const tokenProgramId = getTokenProgramId(mint);
         const [whitelistPda] = getWhitelistPda(vaultPda, wallet.publicKey);
         const nonce = vault.paymentNonce.toNumber();
         const [paymentPda] = getPaymentPda(vaultPda, nonce);
         const vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPda);
         const recipientTokenAccount = getAssociatedTokenAddress(mint, recipient);
+
+        // Create recipient's token account if it doesn't exist
+        const recipientAtaInfo = await connection.getAccountInfo(recipientTokenAccount);
+        if (!recipientAtaInfo) {
+          const createAtaIx = createAssociatedTokenAccountInstruction(
+            wallet.publicKey, recipientTokenAccount, recipient, mint, tokenProgramId,
+          );
+          const { blockhash } = await connection.getLatestBlockhash();
+          const tx = new Transaction({ feePayer: wallet.publicKey, recentBlockhash: blockhash }).add(createAtaIx);
+          const signed = await wallet.signTransaction(tx);
+          const sig = await connection.sendRawTransaction(signed.serialize());
+          await connection.confirmTransaction(sig, "confirmed");
+        }
+
         const { ciphertext, inputType } = await encryptAmount(BigInt(amount));
 
         // amount in token smallest unit (assuming 6 decimals for USDC/USDT)
@@ -305,7 +321,7 @@ export function useVeilPay() {
             vaultTokenAccount,
             recipientTokenAccount,
             tokenMint: mint,
-            tokenProgram: getTokenProgramId(mint),
+            tokenProgram: tokenProgramId,
             incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
           })
