@@ -11,15 +11,17 @@ interface Props {
   canDecrypt?: boolean;
   isAuthority?: boolean;
   grantPaymentAccess?: (paymentPda: PublicKey, handle: bigint) => Promise<void>;
+  settlePayment?: (paymentPda: PublicKey, recipient: PublicKey, amount: number) => Promise<void>;
 }
 
-export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAuthority = false, grantPaymentAccess }: Props) {
+export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAuthority = false, grantPaymentAccess, settlePayment }: Props) {
   const { publicKey, signMessage } = useWallet();
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [revealedAmounts, setRevealedAmounts] = useState<Record<string, string>>({});
   const [revealingNonce, setRevealingNonce] = useState<string | null>(null);
   const [grantingNonce, setGrantingNonce] = useState<string | null>(null);
+  const [settlingNonce, setSettlingNonce] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPayments().then((data) => {
@@ -44,7 +46,6 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
     try {
       const result = await decryptHandle([handle], publicKey, signMessage);
       if (result.error) {
-        // If not allowed, show hint
         setRevealedAmounts((prev) => ({ ...prev, [nonce]: "Not allowed - Grant access first" }));
       } else {
         setRevealedAmounts((prev) => ({ ...prev, [nonce]: result.plaintexts[0] }));
@@ -63,14 +64,29 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
     setGrantingNonce(nonce);
     try {
       await grantPaymentAccess(payment.publicKey, BigInt(handle));
-      // After granting, clear any previous failed attempt
       setRevealedAmounts((prev) => { const n = { ...prev }; delete n[nonce]; return n; });
-    } catch {
-      // error handled by hook
-    } finally {
-      setGrantingNonce(null);
-    }
+    } catch { /* error handled by hook */ }
+    finally { setGrantingNonce(null); }
   }, [grantPaymentAccess]);
+
+  const handleSettle = useCallback(async (payment: PaymentData) => {
+    if (!settlePayment || !payment.publicKey) return;
+    const nonce = payment.nonce.toString();
+    const revealed = revealedAmounts[nonce];
+    if (!revealed || revealed.startsWith("Not allowed") || revealed.startsWith("Decrypt") || revealed === "N/A") {
+      return; // Must decrypt first
+    }
+    // Convert decrypted raw units to token amount (the settle expects raw units with 6 decimals)
+    const rawAmount = Number(revealed);
+    setSettlingNonce(nonce);
+    try {
+      await settlePayment(payment.publicKey, payment.recipient, rawAmount);
+      // Refresh payments
+      const data = await fetchPayments();
+      setPayments(data.sort((a, b) => b.nonce.toNumber() - a.nonce.toNumber()));
+    } catch { /* error handled by hook */ }
+    finally { setSettlingNonce(null); }
+  }, [settlePayment, revealedAmounts, fetchPayments]);
 
   if (!loaded) return null;
 
@@ -89,6 +105,7 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
                 <th className="text-left py-3 pr-4">Sender</th>
                 <th className="text-left py-3 pr-4">Recipient</th>
                 <th className="text-left py-3 pr-4">Amount</th>
+                <th className="text-left py-3 pr-4">Status</th>
                 <th className="text-left py-3">Time</th>
               </tr>
             </thead>
@@ -97,10 +114,12 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
                 const nonce = p.nonce.toString();
                 const handle = extractHandle(p.encryptedAmount);
                 const revealed = revealedAmounts[nonce];
-                const isRevealed = !!revealed && !revealed.startsWith("Not allowed") && !revealed.startsWith("Decrypt failed");
+                const isRevealed = !!revealed && !revealed.startsWith("Not allowed") && !revealed.startsWith("Decrypt");
                 const needsAccess = revealed?.startsWith("Not allowed");
                 const isLoading = revealingNonce === nonce;
                 const isGranting = grantingNonce === nonce;
+                const isSettling = settlingNonce === nonce;
+                const isSettled = p.isSettled;
                 return (
                   <tr
                     key={nonce}
@@ -151,6 +170,26 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
                           </button>
                         )}
                       </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      {isSettled ? (
+                        <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{ background: "rgba(34,197,94,0.12)", color: "#4ade80" }}>
+                          Settled
+                        </span>
+                      ) : isAuthority && isRevealed && settlePayment ? (
+                        <button
+                          onClick={() => handleSettle(p)}
+                          disabled={isSettling}
+                          className="px-3 py-1 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                          style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}
+                        >
+                          {isSettling ? "Settling..." : "Settle"}
+                        </button>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
+                          Pending
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 text-[var(--muted)]">
                       {new Date(p.timestamp.toNumber() * 1000).toLocaleString()}

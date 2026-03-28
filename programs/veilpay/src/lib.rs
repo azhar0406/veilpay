@@ -127,13 +127,9 @@ pub mod veilpay {
         Ok(())
     }
 
-    /// Confidential transfer: checks TEE-encrypted spending limits, then transfers real SPL tokens.
-    pub fn confidential_transfer<'info>(ctx: Context<'_, '_, 'info, 'info, ConfidentialTransfer<'info>>, amount_ciphertext: Vec<u8>, input_type: u8, amount: u64) -> Result<()> {
-        // Extract PDA signer info and account info before mutable borrow
-        let authority_key = ctx.accounts.vault_config.authority;
-        let bump = ctx.accounts.vault_config.bump;
-        let vault_account_info = ctx.accounts.vault_config.to_account_info();
-
+    /// Confidential transfer: only updates encrypted state. No token movement.
+    /// Tokens stay pooled in the vault. Authority settles later via settle_payment.
+    pub fn confidential_transfer<'info>(ctx: Context<'_, '_, 'info, 'info, ConfidentialTransfer<'info>>, amount_ciphertext: Vec<u8>, input_type: u8) -> Result<()> {
         let vault = &mut ctx.accounts.vault_config;
         require!(!vault.is_frozen, VeilPayError::VaultFrozen);
         let whitelist = &ctx.accounts.whitelist;
@@ -176,22 +172,8 @@ pub mod veilpay {
         let nonce = vault.payment_nonce;
         vault.payment_nonce = vault.payment_nonce.checked_add(1).unwrap();
 
-        // Transfer real SPL tokens from vault to recipient using PDA signer
-        let decimals = ctx.accounts.token_mint.decimals;
-        let seeds: &[&[u8]] = &[b"vault_v2", authority_key.as_ref(), &[bump]];
-        let signer_seeds = &[seeds];
-
-        let transfer_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            TransferChecked {
-                from: ctx.accounts.vault_token_account.to_account_info(),
-                mint: ctx.accounts.token_mint.to_account_info(),
-                to: ctx.accounts.recipient_token_account.to_account_info(),
-                authority: vault_account_info,
-            },
-            signer_seeds,
-        );
-        token_interface::transfer_checked(transfer_ctx, amount, decimals)?;
+        // No token transfer — only encrypted state updated.
+        // Tokens stay pooled in vault. Authority settles via settle_payment.
 
         let payment = &mut ctx.accounts.payment_record;
         payment.vault = vault.key();
@@ -201,6 +183,7 @@ pub mod veilpay {
         payment.timestamp = Clock::get()?.unix_timestamp;
         payment.nonce = nonce;
         payment.bump = ctx.bumps.payment_record;
+        payment.is_settled = false;
 
         let ra = &ctx.remaining_accounts;
         if ra.len() >= 8 {
@@ -220,7 +203,39 @@ pub mod veilpay {
             }
         }
 
-        emit!(ConfidentialTransferEvent { vault: vault.key(), sender: payment.sender, recipient: payment.recipient, nonce, amount, timestamp: payment.timestamp });
+        emit!(ConfidentialTransferEvent { vault: vault.key(), sender: payment.sender, recipient: payment.recipient, nonce, timestamp: payment.timestamp });
+        Ok(())
+    }
+
+    /// Settle a payment: Authority decrypts amount off-chain, then calls this to release tokens.
+    pub fn settle_payment(ctx: Context<SettlePayment>, amount: u64) -> Result<()> {
+        let payment = &mut ctx.accounts.payment_record;
+        require!(!payment.is_settled, VeilPayError::AlreadySettled);
+
+        let authority_key = ctx.accounts.vault_config.authority;
+        let bump = ctx.accounts.vault_config.bump;
+        let vault_account_info = ctx.accounts.vault_config.to_account_info();
+
+        // Transfer real SPL tokens from vault to recipient
+        let decimals = ctx.accounts.token_mint.decimals;
+        let seeds: &[&[u8]] = &[b"vault_v2", authority_key.as_ref(), &[bump]];
+        let signer_seeds = &[seeds];
+
+        let transfer_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.vault_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
+                to: ctx.accounts.recipient_token_account.to_account_info(),
+                authority: vault_account_info,
+            },
+            signer_seeds,
+        );
+        token_interface::transfer_checked(transfer_ctx, amount, decimals)?;
+
+        payment.is_settled = true;
+
+        emit!(PaymentSettled { vault: payment.vault, recipient: payment.recipient, nonce: payment.nonce, amount });
         Ok(())
     }
 
@@ -342,8 +357,9 @@ pub struct PaymentRecord {
     pub timestamp: i64,
     pub nonce: u64,
     pub bump: u8,
+    pub is_settled: bool,
 }
-impl PaymentRecord { pub const LEN: usize = 8 + 32 + 32 + 32 + 16 + 8 + 8 + 1 + 32; }
+impl PaymentRecord { pub const LEN: usize = 8 + 32 + 32 + 32 + 16 + 8 + 8 + 1 + 1 + 32; }
 
 // ============================================================
 // CONTEXTS
@@ -426,18 +442,31 @@ pub struct ConfidentialTransfer<'info> {
     pub sender: Signer<'info>,
     /// CHECK: Recipient wallet
     pub recipient: AccountInfo<'info>,
+    /// CHECK: Inco Lightning program
+    #[account(address = INCO_LIGHTNING_ID)]
+    pub inco_lightning_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SettlePayment<'info> {
+    #[account(mut, has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_v2", authority.key().as_ref()], bump = vault_config.bump)]
+    pub vault_config: Account<'info, VaultConfig>,
+    #[account(mut, constraint = payment_record.vault == vault_config.key() @ VeilPayError::Unauthorized)]
+    pub payment_record: Account<'info, PaymentRecord>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// CHECK: Recipient wallet — must match payment record
+    #[account(constraint = recipient.key() == payment_record.recipient @ VeilPayError::Unauthorized)]
+    pub recipient: AccountInfo<'info>,
     #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = vault_config)]
     pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
-    /// CHECK: Recipient token account — validated by token program during transfer
+    /// CHECK: Recipient token account
     #[account(mut)]
     pub recipient_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(address = vault_config.token_mint)]
     pub token_mint: InterfaceAccount<'info, Mint>,
     pub token_program: Interface<'info, TokenInterface>,
-    /// CHECK: Inco Lightning program
-    #[account(address = INCO_LIGHTNING_ID)]
-    pub inco_lightning_program: AccountInfo<'info>,
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -499,7 +528,9 @@ pub struct VaultInitialized { pub vault: Pubkey, pub authority: Pubkey, pub audi
 #[event]
 pub struct ConfidentialDeposit { pub vault: Pubkey, pub depositor: Pubkey, pub amount: u64, pub timestamp: i64 }
 #[event]
-pub struct ConfidentialTransferEvent { pub vault: Pubkey, pub sender: Pubkey, pub recipient: Pubkey, pub nonce: u64, pub amount: u64, pub timestamp: i64 }
+pub struct ConfidentialTransferEvent { pub vault: Pubkey, pub sender: Pubkey, pub recipient: Pubkey, pub nonce: u64, pub timestamp: i64 }
+#[event]
+pub struct PaymentSettled { pub vault: Pubkey, pub recipient: Pubkey, pub nonce: u64, pub amount: u64 }
 #[event]
 pub struct VaultFrozen { pub vault: Pubkey, pub frozen_by: Pubkey }
 
@@ -523,4 +554,6 @@ pub enum VeilPayError {
     InvalidAuditor,
     #[msg("Not enough remaining accounts for allow() calls")]
     InsufficientAccounts,
+    #[msg("Payment already settled")]
+    AlreadySettled,
 }

@@ -48,6 +48,7 @@ export interface PaymentData {
   timestamp: BN;
   nonce: BN;
   bump: number;
+  isSettled: boolean;
 }
 
 function getProgram(wallet: any, connection: any): Program | null {
@@ -272,7 +273,7 @@ export function useVeilPay() {
     [wallet, connection, vaultPda, vault, fetchVault]
   );
 
-  // Confidential transfer — TEE checks + real token transfer
+  // Confidential transfer — TEE encrypted state only, no token movement
   const transfer = useCallback(
     async (recipientAddress: string, amount: number) => {
       const program = getProgram(wallet, connection);
@@ -286,44 +287,20 @@ export function useVeilPay() {
 
       try {
         const recipient = new PublicKey(recipientAddress);
-        const mint = vault.tokenMint;
-        const tokenProgramId = getTokenProgramId(mint);
         const [whitelistPda] = getWhitelistPda(vaultPda, wallet.publicKey);
         const nonce = vault.paymentNonce.toNumber();
         const [paymentPda] = getPaymentPda(vaultPda, nonce);
-        const vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPda);
-        const recipientTokenAccount = getAssociatedTokenAddress(mint, recipient);
-
-        // Create recipient's token account if it doesn't exist
-        const recipientAtaInfo = await connection.getAccountInfo(recipientTokenAccount);
-        if (!recipientAtaInfo) {
-          const createAtaIx = createAssociatedTokenAccountInstruction(
-            wallet.publicKey, recipientTokenAccount, recipient, mint, tokenProgramId,
-          );
-          const { blockhash } = await connection.getLatestBlockhash();
-          const tx = new Transaction({ feePayer: wallet.publicKey, recentBlockhash: blockhash }).add(createAtaIx);
-          const signed = await wallet.signTransaction(tx);
-          const sig = await connection.sendRawTransaction(signed.serialize());
-          await connection.confirmTransaction(sig, "confirmed");
-        }
 
         const { ciphertext, inputType } = await encryptAmount(BigInt(amount));
 
-        // amount in token smallest unit (assuming 6 decimals for USDC/USDT)
-        const tokenAmount = new BN(amount).mul(new BN(10).pow(new BN(6)));
-
         await (program.methods as any)
-          .confidentialTransfer(Buffer.from(ciphertext), inputType, tokenAmount)
+          .confidentialTransfer(Buffer.from(ciphertext), inputType)
           .accounts({
             vaultConfig: vaultPda,
             whitelist: whitelistPda,
             paymentRecord: paymentPda,
             sender: wallet.publicKey,
             recipient,
-            vaultTokenAccount,
-            recipientTokenAccount,
-            tokenMint: mint,
-            tokenProgram: tokenProgramId,
             incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
           })
@@ -398,6 +375,68 @@ export function useVeilPay() {
       return [];
     }
   }, [wallet, connection, vaultPda]);
+
+  // Settle a payment — authority releases tokens to recipient
+  const settlePayment = useCallback(
+    async (paymentPda: PublicKey, recipientAddress: PublicKey, amount: number) => {
+      const program = getProgram(wallet, connection);
+      if (!program || !wallet || !vaultPda || !vault) {
+        setError("Wallet not connected or vault not found");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [freshVaultPda] = getVaultPda(wallet.publicKey);
+        const mint = vault.tokenMint;
+        const tokenProgramId = getTokenProgramId(mint);
+        const vaultTokenAccount = getAssociatedTokenAddress(mint, freshVaultPda);
+        const recipientTokenAccount = getAssociatedTokenAddress(mint, recipientAddress);
+
+        // Create recipient's token account if it doesn't exist
+        const recipientAtaInfo = await connection.getAccountInfo(recipientTokenAccount);
+        if (!recipientAtaInfo) {
+          const createAtaIx = createAssociatedTokenAccountInstruction(
+            wallet.publicKey, recipientTokenAccount, recipientAddress, mint, tokenProgramId,
+          );
+          const { blockhash } = await connection.getLatestBlockhash();
+          const tx = new Transaction({ feePayer: wallet.publicKey, recentBlockhash: blockhash }).add(createAtaIx);
+          const signed = await wallet.signTransaction(tx);
+          const sig = await connection.sendRawTransaction(signed.serialize());
+          await connection.confirmTransaction(sig, "confirmed");
+        }
+
+        // amount in token smallest unit (6 decimals)
+        const tokenAmount = new BN(amount).mul(new BN(10).pow(new BN(6)));
+
+        await (program.methods as any)
+          .settlePayment(tokenAmount)
+          .accounts({
+            vaultConfig: freshVaultPda,
+            paymentRecord: paymentPda,
+            authority: wallet.publicKey,
+            recipient: recipientAddress,
+            vaultTokenAccount,
+            recipientTokenAccount,
+            tokenMint: mint,
+            tokenProgram: tokenProgramId,
+          })
+          .rpc();
+
+        await fetchVault();
+      } catch (err: unknown) {
+        if (isUserRejection(err)) { setLoading(false); return; }
+        const msg = err instanceof Error ? err.message : "Settlement failed";
+        setError(msg);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [wallet, connection, vaultPda, vault, fetchVault]
+  );
 
   // Grant decrypt access to authority and auditor for all vault handles
   const grantDecryptAccess = useCallback(async () => {
@@ -510,5 +549,6 @@ export function useVeilPay() {
     fetchVault,
     grantDecryptAccess,
     grantPaymentAccess,
+    settlePayment,
   };
 }

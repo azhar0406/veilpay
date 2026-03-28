@@ -80,42 +80,17 @@
     {
       "name": "confidential_transfer",
       "docs": [
-        "Confidential transfer: checks TEE-encrypted spending limits, then transfers real SPL tokens."
+        "Confidential transfer: only updates encrypted state. No token movement."
       ],
-      "discriminator": [
-        97,
-        79,
-        128,
-        58,
-        134,
-        222,
-        73,
-        143
-      ],
+      "discriminator": [97, 79, 128, 58, 134, 222, 73, 143],
       "accounts": [
         {
           "name": "vault_config",
           "writable": true,
           "pda": {
             "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116,
-                  95,
-                  118,
-                  50
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "vault_config.authority",
-                "account": "VaultConfig"
-              }
+              { "kind": "const", "value": [118, 97, 117, 108, 116, 95, 118, 50] },
+              { "kind": "account", "path": "vault_config.authority", "account": "VaultConfig" }
             ]
           }
         },
@@ -123,28 +98,9 @@
           "name": "whitelist",
           "pda": {
             "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  104,
-                  105,
-                  116,
-                  101,
-                  108,
-                  105,
-                  115,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "vault_config"
-              },
-              {
-                "kind": "account",
-                "path": "sender"
-              }
+              { "kind": "const", "value": [119, 104, 105, 116, 101, 108, 105, 115, 116] },
+              { "kind": "account", "path": "vault_config" },
+              { "kind": "account", "path": "sender" }
             ]
           }
         },
@@ -153,161 +109,47 @@
           "writable": true,
           "pda": {
             "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  121,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "vault_config"
-              },
-              {
-                "kind": "account",
-                "path": "vault_config.payment_nonce",
-                "account": "VaultConfig"
-              }
+              { "kind": "const", "value": [112, 97, 121, 109, 101, 110, 116] },
+              { "kind": "account", "path": "vault_config" },
+              { "kind": "account", "path": "vault_config.payment_nonce", "account": "VaultConfig" }
             ]
           }
         },
+        { "name": "sender", "writable": true, "signer": true },
+        { "name": "recipient" },
+        { "name": "inco_lightning_program", "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "amount_ciphertext", "type": "bytes" },
+        { "name": "input_type", "type": "u8" }
+      ]
+    },
+    {
+      "name": "settle_payment",
+      "docs": ["Settle a payment: Authority decrypts amount off-chain, then calls this to release tokens."],
+      "discriminator": [129, 7, 163, 250, 122, 226, 158, 249],
+      "accounts": [
         {
-          "name": "sender",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "recipient"
-        },
-        {
-          "name": "vault_token_account",
+          "name": "vault_config",
           "writable": true,
           "pda": {
             "seeds": [
-              {
-                "kind": "account",
-                "path": "vault_config"
-              },
-              {
-                "kind": "const",
-                "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "vault_config.token_mint",
-                "account": "VaultConfig"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
-              ]
-            }
+              { "kind": "const", "value": [118, 97, 117, 108, 116, 95, 118, 50] },
+              { "kind": "account", "path": "authority" }
+            ]
           }
         },
-        {
-          "name": "recipient_token_account",
-          "writable": true
-        },
-        {
-          "name": "token_mint"
-        },
-        {
-          "name": "token_program"
-        },
-        {
-          "name": "inco_lightning_program",
-          "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
+        { "name": "payment_record", "writable": true },
+        { "name": "authority", "writable": true, "signer": true, "relations": ["vault_config"] },
+        { "name": "recipient" },
+        { "name": "vault_token_account", "writable": true },
+        { "name": "recipient_token_account", "writable": true },
+        { "name": "token_mint" },
+        { "name": "token_program" }
       ],
       "args": [
-        {
-          "name": "amount_ciphertext",
-          "type": "bytes"
-        },
-        {
-          "name": "input_type",
-          "type": "u8"
-        },
-        {
-          "name": "amount",
-          "type": "u64"
-        }
+        { "name": "amount", "type": "u64" }
       ]
     },
     {
