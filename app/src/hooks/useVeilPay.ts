@@ -99,47 +99,50 @@ export function useVeilPay() {
     setVaultPda(null);
   }, []);
 
-  // Fetch vault data — auto-detect based on connected wallet role
+  // Fetch/refresh the currently selected vault, or auto-detect on first load
   const fetchVault = useCallback(async () => {
     if (!wallet) return;
     const program = getProgram(wallet, connection);
     if (!program) return;
 
-    // Also fetch all vaults for the listing
+    // Always refresh the vault list
+    fetchAllVaults();
+  }, [wallet, connection, fetchAllVaults]);
+
+  // Refresh selected vault data (called after transactions)
+  const refreshSelectedVault = useCallback(async () => {
+    if (!wallet || !vaultPda) return;
+    const program = getProgram(wallet, connection);
+    if (!program) return;
+    try {
+      const data = await (program.account as any).vaultConfig.fetch(vaultPda);
+      setVault(data as VaultData);
+    } catch {
+      setVault(null);
+      setVaultPda(null);
+    }
+  }, [wallet, connection, vaultPda]);
+
+  // On wallet connect: fetch list and auto-select if authority
+  useEffect(() => {
+    if (!wallet) {
+      setVault(null);
+      setVaultPda(null);
+      setAllVaults([]);
+      return;
+    }
+    const program = getProgram(wallet, connection);
+    if (!program) return;
+
     fetchAllVaults();
 
-    // If a vault is already selected, refresh its data
-    if (vaultPda) {
-      try {
-        const data = await (program.account as any).vaultConfig.fetch(vaultPda);
-        setVault(data as VaultData);
-        setError(null);
-        return;
-      } catch {
-        // Vault no longer exists (closed)
-        setVault(null);
-        setVaultPda(null);
-      }
-    }
-
-    // Auto-detect: check if wallet is authority
+    // Auto-select if wallet is an authority
     const [ownPda] = getVaultPda(wallet.publicKey);
-    try {
-      const data = await (program.account as any).vaultConfig.fetch(ownPda);
-      setVault(data as VaultData);
+    (program.account as any).vaultConfig.fetch(ownPda).then((data: VaultData) => {
+      setVault(data);
       setVaultPda(ownPda);
-      setError(null);
-      return;
-    } catch { /* not authority */ }
-
-    // Don't auto-select — let user pick from the list
-    setVault(null);
-    setVaultPda(null);
-  }, [wallet, connection, vaultPda, fetchAllVaults]);
-
-  useEffect(() => {
-    fetchVault();
-  }, [fetchVault]);
+    }).catch(() => { /* not authority — user picks from list */ });
+  }, [wallet, connection, fetchAllVaults]);
 
   // Initialize vault with a token mint
   const initializeVault = useCallback(
@@ -176,7 +179,7 @@ export function useVeilPay() {
           })
           .rpc();
 
-        await fetchVault();
+        await refreshSelectedVault();
       } catch (err: unknown) {
         const msg =
           err instanceof Error ? err.message : "Failed to initialize vault";
@@ -185,7 +188,7 @@ export function useVeilPay() {
         setLoading(false);
       }
     },
-    [wallet, connection, fetchVault]
+    [wallet, connection, refreshSelectedVault]
   );
 
   // Add to whitelist
@@ -300,7 +303,7 @@ export function useVeilPay() {
           })
           .rpc();
 
-        await fetchVault();
+        await refreshSelectedVault();
       } catch (err: unknown) {
         if (isUserRejection(err)) { setLoading(false); return; }
         const msg = err instanceof Error ? err.message : "Deposit failed";
@@ -310,7 +313,7 @@ export function useVeilPay() {
         setLoading(false);
       }
     },
-    [wallet, connection, vaultPda, vault, fetchVault]
+    [wallet, connection, vaultPda, vault, refreshSelectedVault]
   );
 
   // Confidential transfer — TEE encrypted state only, no token movement
@@ -348,7 +351,7 @@ export function useVeilPay() {
           })
           .rpc();
 
-        await fetchVault();
+        await refreshSelectedVault();
       } catch (err: unknown) {
         if (isUserRejection(err)) { setLoading(false); return; }
         const msg = err instanceof Error ? err.message : "Transfer failed";
@@ -358,7 +361,7 @@ export function useVeilPay() {
         setLoading(false);
       }
     },
-    [wallet, connection, vaultPda, vault, fetchVault]
+    [wallet, connection, vaultPda, vault, refreshSelectedVault]
   );
 
   // Freeze / Unfreeze
@@ -391,7 +394,7 @@ export function useVeilPay() {
         })
         .rpc();
 
-      await fetchVault();
+      await refreshSelectedVault();
     } catch (err: unknown) {
       if (isUserRejection(err)) { setLoading(false); return; }
       const msg = err instanceof Error ? err.message : "Close vault failed";
@@ -400,7 +403,7 @@ export function useVeilPay() {
     } finally {
       setLoading(false);
     }
-  }, [wallet, connection, vault, fetchVault]);
+  }, [wallet, connection, vault, refreshSelectedVault]);
 
   const toggleFreeze = useCallback(async () => {
     const program = getProgram(wallet, connection);
@@ -427,7 +430,7 @@ export function useVeilPay() {
         })
         .rpc();
 
-      await fetchVault();
+      await refreshSelectedVault();
     } catch (err: unknown) {
       if (isUserRejection(err)) { setLoading(false); return; }
       const msg = err instanceof Error ? err.message : "Freeze/unfreeze failed";
@@ -436,7 +439,7 @@ export function useVeilPay() {
     } finally {
       setLoading(false);
     }
-  }, [wallet, connection, vault, fetchVault]);
+  }, [wallet, connection, vault, refreshSelectedVault]);
 
   // Fetch payment records
   const fetchPayments = useCallback(async (): Promise<PaymentData[]> => {
@@ -505,7 +508,7 @@ export function useVeilPay() {
           })
           .rpc();
 
-        await fetchVault();
+        await refreshSelectedVault();
       } catch (err: unknown) {
         if (isUserRejection(err)) { setLoading(false); return; }
         const msg = err instanceof Error ? err.message : "Claim failed";
@@ -515,7 +518,7 @@ export function useVeilPay() {
         setLoading(false);
       }
     },
-    [wallet, connection, vaultPda, vault, fetchVault]
+    [wallet, connection, vaultPda, vault, refreshSelectedVault]
   );
 
   // Grant decrypt access to authority and auditor for all vault handles
@@ -626,7 +629,7 @@ export function useVeilPay() {
     transfer,
     toggleFreeze,
     fetchPayments,
-    fetchVault,
+    fetchVault: refreshSelectedVault,
     grantDecryptAccess,
     grantPaymentAccess,
     claimPayment,
