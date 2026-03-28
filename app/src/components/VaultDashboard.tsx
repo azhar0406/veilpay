@@ -130,7 +130,7 @@ export default function VaultDashboard() {
               className="grid grid-cols-3 gap-6 max-w-xl w-full mt-2"
             >
               {[
-                { icon: "&#128274;", title: "Encrypted Balances", desc: "Vault balances hidden via FHE" },
+                { icon: "&#128274;", title: "Encrypted Balances", desc: "Vault balances hidden via TEE" },
                 { icon: "&#128275;", title: "Auditor Access", desc: "Selective disclosure for compliance" },
                 { icon: "&#9889;", title: "Spending Limits", desc: "Enforced on encrypted values" },
               ].map((f, i) => (

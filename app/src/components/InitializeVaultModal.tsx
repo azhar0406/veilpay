@@ -161,7 +161,7 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
             </div>
             <p style={{ color: "var(--muted)", fontSize: "12px", marginTop: "6px", lineHeight: "1.5" }}>
               Maximum total amount that can be transferred per Solana epoch (~2 days).
-              This limit is encrypted on-chain and enforced via FHE computation.
+              This limit is encrypted on-chain and enforced via TEE computation.
             </p>
 
             {/* Quick presets */}

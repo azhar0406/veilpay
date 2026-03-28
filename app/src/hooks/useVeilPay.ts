@@ -269,7 +269,7 @@ export function useVeilPay() {
     [wallet, connection, vaultPda, vault, fetchVault]
   );
 
-  // Confidential transfer — FHE checks + real token transfer
+  // Confidential transfer — TEE checks + real token transfer
   const transfer = useCallback(
     async (recipientAddress: string, amount: number) => {
       const program = getProgram(wallet, connection);

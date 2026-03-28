@@ -80,7 +80,7 @@
     {
       "name": "confidential_transfer",
       "docs": [
-        "Confidential transfer: checks FHE spending limits, then transfers real SPL tokens."
+        "Confidential transfer: checks TEE-encrypted spending limits, then transfers real SPL tokens."
       ],
       "discriminator": [
         97,

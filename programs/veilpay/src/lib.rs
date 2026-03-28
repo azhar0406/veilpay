@@ -98,7 +98,7 @@ pub mod veilpay {
         );
         token_interface::transfer_checked(transfer_ctx, amount, decimals)?;
 
-        // FHE: encrypt the amount and add to encrypted balance
+        // TEE: encrypt the amount and add to encrypted balance
         let inco = ctx.accounts.inco_lightning_program.to_account_info();
         let signer = ctx.accounts.depositor.to_account_info();
         let sys = ctx.accounts.system_program.to_account_info();
@@ -127,7 +127,7 @@ pub mod veilpay {
         Ok(())
     }
 
-    /// Confidential transfer: checks FHE spending limits, then transfers real SPL tokens.
+    /// Confidential transfer: checks TEE-encrypted spending limits, then transfers real SPL tokens.
     pub fn confidential_transfer<'info>(ctx: Context<'_, '_, 'info, 'info, ConfidentialTransfer<'info>>, amount_ciphertext: Vec<u8>, input_type: u8, amount: u64) -> Result<()> {
         // Extract PDA signer info and account info before mutable borrow
         let authority_key = ctx.accounts.vault_config.authority;

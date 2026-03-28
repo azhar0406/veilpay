@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <em>"Veil" is also a Tamil word — it means sunlight. You cannot look at the sun with bare eyes, but with the right equipment you can observe it clearly. VeilPay works the same way: vault balances and transfer amounts are invisible on-chain, but with Inco's FHE decryption tools, authorized parties can see the exact numbers.</em>
+  <em>"Veil" is also a Tamil word — it means sunlight. You cannot look at the sun with bare eyes, but with the right equipment you can observe it clearly. VeilPay works the same way: vault balances and transfer amounts are invisible on-chain, but with Inco's TEE-based decryption tools, authorized parties can see the exact numbers.</em>
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@ Institutions want to use stablecoins for treasury operations — payments, settl
 
 VeilPay brings institutional-grade confidentiality to programmable stablecoin payments on Solana:
 
-- **Encrypted Vault Balances** — All vault balances stored as encrypted handles via Inco Lightning FHE
+- **Encrypted Vault Balances** — All vault balances stored as encrypted handles via Inco Lightning TEE
 - **Confidential Transfers** — Transfer amounts are fully encrypted on-chain
 - **Encrypted Spending Limits** — Per-epoch spending limits enforced on encrypted values without revealing the cap
 - **Selective Disclosure** — Designated auditors can decrypt balances for compliance — like wearing the right lens to see the sun
@@ -71,9 +71,9 @@ User A ──► "Create vault with USDC, spending limit $1,000"
 │  authority: User A           │
 │  auditor: User B             │
 │  token: USDC                 │
-│  balance: ██████ (encrypted) │  ◄── FHE: nobody can read this
-│  limit:   ██████ (encrypted) │  ◄── FHE: $1,000 but hidden
-│  spent:   ██████ (encrypted) │  ◄── FHE: tracked privately
+│  balance: ██████ (encrypted) │  ◄── TEE: nobody can read this
+│  limit:   ██████ (encrypted) │  ◄── TEE: $1,000 but hidden
+│  spent:   ██████ (encrypted) │  ◄── TEE: tracked privately
 └──────────────────────────────┘
 ```
 
@@ -94,7 +94,7 @@ User A ──► "Allow User C to deposit & transfer"
 
 ### Step 3: Deposit (User C — Depositor)
 
-User C deposits USDC into the vault. The real tokens move via SPL transfer, and the vault's encrypted balance is updated via FHE.
+User C deposits USDC into the vault. The real tokens move via SPL transfer, and the vault's encrypted balance is updated via Inco's TEE-based confidential computation.
 
 ```
 User C ──► "Deposit 100 USDC"
@@ -103,7 +103,7 @@ User C ──► "Deposit 100 USDC"
               │    User C's wallet ──► Vault token account  │ VISIBLE on Explorer
               │    (100 USDC moves)                         │
               │                                             │
-              ├──► FHE Encryption ──────────────────────────┘
+              ├──► TEE Encryption ──────────────────────────┘
               │    encrypt(100) ──► Inco Lightning
               │    vault.balance = e_add(old_balance, encrypted_100)
               │
@@ -112,7 +112,7 @@ User C ──► "Deposit 100 USDC"
 │  Vault After Deposit         │
 │  ─────────────────────────── │
 │  USDC in vault: 100          │  ◄── visible (SPL account)
-│  balance: ██████ (encrypted) │  ◄── FHE: updated secretly
+│  balance: ██████ (encrypted) │  ◄── TEE: updated secretly
 └──────────────────────────────┘
 ```
 
@@ -125,7 +125,7 @@ User C ──► "Send 30 USDC to Bob"
               │
               ▼
 ┌─────────────────────────────────────────────┐
-│  FHE SPENDING LIMIT CHECK (all encrypted!)  │
+│  TEE SPENDING LIMIT CHECK (all encrypted!)  │
 │                                             │
 │  new_spent = spent + 30      ◄── e_add()    │
 │  ok? = (limit >= new_spent)  ◄── e_ge()     │  ALL happens on
@@ -181,7 +181,7 @@ User A can freeze the vault at any time for compliance. No deposits or transfers
 │  ├── Which wallets are whitelisted                          │
 │  └── Transaction timestamps                                 │
 │                                                              │
-│  PRIVATE (encrypted via Inco FHE):                          │
+│  PRIVATE (encrypted via Inco TEE):                          │
 │  ├── Vault's internal balance tracking                      │
 │  ├── Spending limit value                                   │
 │  ├── How much has been spent this epoch                     │
@@ -192,13 +192,13 @@ User A can freeze the vault at any time for compliance. No deposits or transfers
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## The FHE Magic — In Simple Terms
+## The TEE Magic — In Simple Terms
 
 ```
 Traditional way:
   if (spent + amount <= limit)  →  everyone sees spent, amount, limit
 
-VeilPay FHE way:
+VeilPay TEE way:
   if (██████ + ██████ <= ██████) →  nobody sees the numbers
        ▲         ▲         ▲
        │         │         │
@@ -212,7 +212,7 @@ VeilPay FHE way:
 
 ## Role Summary
 
-| Action | Who | Real Tokens Move? | FHE Used? |
+| Action | Who | Real Tokens Move? | TEE Used? |
 |--------|-----|-------------------|-----------|
 | Create Vault | User A (Authority) | No | Yes (encrypt limit) |
 | Whitelist | User A (Authority) | No | No |
@@ -228,7 +228,7 @@ VeilPay FHE way:
 ```
 ┌──────────────┐     ┌─────────────────┐     ┌───────────────────┐
 │   Next.js    │────>│  Solana Program  │────>│ Inco Covalidator  │
-│   Frontend   │     │   (Anchor/Rust)  │ CPI │  (FHE off-chain)  │
+│   Frontend   │     │   (Anchor/Rust)  │ CPI │  (TEE off-chain)  │
 │              │     │                  │     │                   │
 │ Wallet       │     │ VaultConfig PDA  │     │ Encrypted values  │
 │ Encrypt      │     │ Whitelist PDA    │     │ stored off-chain  │
@@ -241,7 +241,7 @@ VeilPay FHE way:
 | Layer | Technology |
 |-------|-----------|
 | Smart Contract | Anchor 0.31.1 (Rust) |
-| Privacy | Inco Lightning SVM 0.1.4 (FHE) |
+| Privacy | Inco Lightning SVM 0.1.4 (TEE) |
 | Token Standard | SPL Token (USDC/USDT) |
 | Frontend | Next.js 16, Tailwind CSS |
 | Wallet | Solana Wallet Adapter (Phantom) |
@@ -254,7 +254,7 @@ VeilPay FHE way:
 | `initialize_vault` | Create a confidential treasury vault with encrypted balance and spending limit |
 | `add_to_whitelist` | Whitelist a wallet with a specific role (depositor/transferrer/admin) |
 | `remove_from_whitelist` | Remove a wallet from the vault whitelist |
-| `deposit` | Transfer real SPL tokens into vault + update encrypted balance via FHE |
+| `deposit` | Transfer real SPL tokens into vault + update encrypted balance via TEE |
 | `confidential_transfer` | Transfer encrypted amount to a recipient with spending limit checks |
 | `freeze_vault` / `unfreeze_vault` | Compliance freeze/unfreeze |
 | `reset_epoch` | Reset spending tracker when epoch changes |
