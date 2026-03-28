@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useVeilPay } from "@/hooks/useVeilPay";
-import { formatEncryptedHandle, extractHandle } from "@/lib/inco";
+import { formatEncryptedHandle, extractHandle, decryptHandle } from "@/lib/inco";
 import InitializeVaultModal from "./InitializeVaultModal";
 import DepositModal from "./DepositModal";
 import TransferModal from "./TransferModal";
@@ -40,12 +40,40 @@ export default function VaultDashboard() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showWhitelist, setShowWhitelist] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
+  const [revealingKey, setRevealingKey] = useState<string | null>(null);
 
   const showToast = useCallback((message: string, type: "success" | "error") => {
     const id = Date.now();
     setToasts((prev) => [...prev, { message, type, id }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
   }, []);
+
+  const { signMessage } = useWallet();
+
+  const handleRevealValue = useCallback(async (key: string, handle: string) => {
+    if (!publicKey || !signMessage) {
+      showToast("Wallet does not support message signing", "error");
+      return;
+    }
+    if (revealedValues[key]) {
+      // Toggle off
+      setRevealedValues((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      return;
+    }
+    setRevealingKey(key);
+    try {
+      const result = await decryptHandle([handle], publicKey, signMessage);
+      if (result.error) {
+        showToast("Decryption failed: " + result.error, "error");
+      }
+      setRevealedValues((prev) => ({ ...prev, [key]: result.plaintexts[0] }));
+    } catch {
+      showToast("Decryption failed", "error");
+    } finally {
+      setRevealingKey(null);
+    }
+  }, [publicKey, signMessage, revealedValues, showToast]);
 
   const isAuthority = vault && publicKey && vault.authority.equals(publicKey);
   const isAuditor = vault && publicKey && vault.auditor.equals(publicKey);
@@ -249,27 +277,58 @@ export default function VaultDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { label: "Vault Balance", value: extractHandle(vault.encryptedBalance), sub: "Encrypted via Inco Lightning" },
-                  { label: "Spending Limit", value: extractHandle(vault.encryptedSpendingLimit), sub: "Per-epoch encrypted limit" },
-                  { label: "Epoch Spent", value: extractHandle(vault.encryptedSpentThisEpoch), sub: `Epoch ${vault.currentEpoch.toString()}` },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl p-4"
-                    style={{ background: "var(--surface)", border: "1px solid var(--card-border)" }}
-                  >
-                    <p style={{ color: "var(--muted)", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>
-                      {item.label}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span style={{ fontSize: "16px" }}>&#128274;</span>
-                      <span className="text-lg font-mono text-white font-semibold">
-                        {formatEncryptedHandle(item.value)}
-                      </span>
+                  { key: "balance", label: "Vault Balance", value: extractHandle(vault.encryptedBalance), sub: "Encrypted via Inco Lightning" },
+                  { key: "limit", label: "Spending Limit", value: extractHandle(vault.encryptedSpendingLimit), sub: "Per-epoch encrypted limit" },
+                  { key: "spent", label: "Epoch Spent", value: extractHandle(vault.encryptedSpentThisEpoch), sub: `Epoch ${vault.currentEpoch.toString()}` },
+                ].map((item) => {
+                  const isRevealed = !!revealedValues[item.key];
+                  const isLoading = revealingKey === item.key;
+                  return (
+                    <div
+                      key={item.key}
+                      className="rounded-xl p-4"
+                      style={{ background: "var(--surface)", border: `1px solid ${isRevealed ? "rgba(34,197,94,0.3)" : "var(--card-border)"}` }}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p style={{ color: "var(--muted)", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                          {item.label}
+                        </p>
+                        <button
+                          onClick={() => handleRevealValue(item.key, item.value)}
+                          disabled={isLoading}
+                          className="p-1 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50"
+                          title={isRevealed ? "Hide value" : "Decrypt & reveal"}
+                        >
+                          {isLoading ? (
+                            <span className="inline-block w-4 h-4 rounded-full animate-spin" style={{ border: "2px solid var(--card-border)", borderTopColor: "var(--accent)" }} />
+                          ) : (
+                            <span style={{ fontSize: "16px", cursor: "pointer" }}>
+                              {isRevealed ? "\uD83D\uDC41\uFE0F" : "\uD83D\uDC41\u200D\uD83D\uDDE8\uFE0F"}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isRevealed ? (
+                          <>
+                            <span style={{ fontSize: "16px" }}>&#128275;</span>
+                            <span className="text-lg font-mono font-semibold" style={{ color: "#4ade80" }}>
+                              {revealedValues[item.key]}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: "16px" }}>&#128274;</span>
+                            <span className="text-lg font-mono text-white font-semibold">
+                              {formatEncryptedHandle(item.value)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <p style={{ color: "var(--muted)", fontSize: "11px", marginTop: "4px" }}>{item.sub}</p>
                     </div>
-                    <p style={{ color: "var(--muted)", fontSize: "11px", marginTop: "4px" }}>{item.sub}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Vault Details */}
