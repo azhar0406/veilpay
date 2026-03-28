@@ -1095,6 +1095,16 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "is_settled",
+            "type": "bool"
+          },
+          {
+            "name": "amount_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
           }
         ]
       }
