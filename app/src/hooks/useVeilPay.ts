@@ -62,7 +62,7 @@ function getProgram(wallet: any, connection: any): Program | null {
 // The authority address that created the vault — hardcoded for this hackathon demo
 // so that auditor and other wallets can also find the vault.
 const VAULT_AUTHORITY = new PublicKey(
-  "EHq49A6KfUccJJJHZxBiu8TavDgAUmzyFK7xe4YduCWJ"
+  "EzYPTnGCajb2bxGeKYzooyiFP7JLemWLNcf5JZdztzSy"
 );
 
 export function useVeilPay() {
