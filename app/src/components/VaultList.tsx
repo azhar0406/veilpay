@@ -90,7 +90,7 @@ export default function VaultList({ vaults, onSelect, onCreate, loading }: Props
   }, [vaults, publicKey, connection]);
 
   const roleLabel: Record<VaultRole, { text: string; color: string; bg: string }> = {
-    authority: { text: "Your Vault", color: "#4ade80", bg: "rgba(34,197,94,0.12)" },
+    authority: { text: "Your Vault", color: "#FBBF24", bg: "rgba(251,191,36,0.15)" },
     auditor: { text: "Auditor", color: "#60a5fa", bg: "rgba(59,130,246,0.12)" },
     whitelisted: { text: "Member", color: "#fbbf24", bg: "rgba(251,191,36,0.12)" },
     none: { text: "", color: "", bg: "" },
@@ -149,7 +149,7 @@ export default function VaultList({ vaults, onSelect, onCreate, loading }: Props
                 className="text-left rounded-2xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
                 style={{
                   background: "var(--card)",
-                  border: isOwn ? "1.5px solid rgba(34,197,94,0.4)" : "1px solid var(--card-border)",
+                  border: isOwn ? "1.5px solid rgba(251,191,36,0.4)" : "1px solid var(--card-border)",
                 }}
               >
                 <div className="flex items-center justify-between mb-3">
@@ -205,13 +205,19 @@ export default function VaultList({ vaults, onSelect, onCreate, loading }: Props
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between">
-                  {isOwn && (
-                    <span className="text-xs" style={{ color: "var(--muted)" }}>
-                      You own this vault
-                    </span>
-                  )}
-                  <span className="text-xs font-semibold ml-auto" style={{ color: "var(--accent)" }}>
+                <div className="mt-4">
+                  <span
+                    className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold transition-all"
+                    style={{
+                      background: isOwn
+                        ? "linear-gradient(135deg, #F59E0B, #D97706)"
+                        : "linear-gradient(135deg, #3b82f6, #2563eb)",
+                      color: "#fff",
+                      boxShadow: isOwn
+                        ? "0 2px 12px rgba(245,158,11,0.25)"
+                        : "0 2px 12px rgba(59,130,246,0.2)",
+                    }}
+                  >
                     Enter Vault &rarr;
                   </span>
                 </div>
