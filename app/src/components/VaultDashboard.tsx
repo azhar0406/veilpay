@@ -36,6 +36,7 @@ export default function VaultDashboard() {
     grantDecryptAccess,
     grantPaymentAccess,
     claimPayment,
+    closeVault,
   } = useVeilPay();
 
   const [showInit, setShowInit] = useState(false);
@@ -122,6 +123,14 @@ export default function VaultDashboard() {
       showToast(vault?.isFrozen ? "Vault unfrozen" : "Vault frozen", "success");
     } catch { showToast("Freeze/unfreeze failed", "error"); }
   }, [toggleFreeze, vault, showToast]);
+
+  const handleCloseVault = useCallback(async () => {
+    if (!confirm("Are you sure? This will close the vault and return all tokens + rent to your wallet.")) return;
+    try {
+      await closeVault();
+      showToast("Vault closed — tokens returned", "success");
+    } catch { showToast("Close vault failed", "error"); }
+  }, [closeVault, showToast]);
 
   const handleGrantAccess = useCallback(async () => {
     try {
@@ -277,17 +286,27 @@ export default function VaultDashboard() {
                   </span>
                 </div>
                 {isAuthority && (
-                  <button
-                    onClick={handleFreeze}
-                    disabled={loading}
-                    className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-                    style={{
-                      background: vault.isFrozen ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
-                      color: vault.isFrozen ? "#4ade80" : "#f87171",
-                    }}
-                  >
-                    {vault.isFrozen ? "Unfreeze Vault" : "Freeze Vault"}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleFreeze}
+                      disabled={loading}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                      style={{
+                        background: vault.isFrozen ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+                        color: vault.isFrozen ? "#4ade80" : "#f87171",
+                      }}
+                    >
+                      {vault.isFrozen ? "Unfreeze Vault" : "Freeze Vault"}
+                    </button>
+                    <button
+                      onClick={handleCloseVault}
+                      disabled={loading}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                      style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
+                    >
+                      Close Vault
+                    </button>
+                  </div>
                 )}
               </div>
 

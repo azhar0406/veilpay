@@ -322,6 +322,46 @@ export function useVeilPay() {
   );
 
   // Freeze / Unfreeze
+  // Close vault — returns tokens + rent to authority
+  const closeVault = useCallback(async () => {
+    const program = getProgram(wallet, connection);
+    if (!program || !wallet || !vault) {
+      setError("Wallet not connected or vault not found");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [freshVaultPda] = getVaultPda(wallet.publicKey);
+      const mint = vault.tokenMint;
+      const vaultTokenAccount = getAssociatedTokenAddress(mint, freshVaultPda);
+      const authorityTokenAccount = getAssociatedTokenAddress(mint, wallet.publicKey);
+
+      await (program.methods as any)
+        .closeVault()
+        .accounts({
+          vaultConfig: freshVaultPda,
+          authority: wallet.publicKey,
+          vaultTokenAccount,
+          authorityTokenAccount,
+          tokenMint: mint,
+          tokenProgram: getTokenProgramId(mint),
+        })
+        .rpc();
+
+      await fetchVault();
+    } catch (err: unknown) {
+      if (isUserRejection(err)) { setLoading(false); return; }
+      const msg = err instanceof Error ? err.message : "Close vault failed";
+      setError(msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [wallet, connection, vault, fetchVault]);
+
   const toggleFreeze = useCallback(async () => {
     const program = getProgram(wallet, connection);
     if (!program || !wallet || !vault) {
@@ -550,5 +590,6 @@ export function useVeilPay() {
     grantDecryptAccess,
     grantPaymentAccess,
     claimPayment,
+    closeVault,
   };
 }

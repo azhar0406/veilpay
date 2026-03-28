@@ -540,6 +540,29 @@
       "args": []
     },
     {
+      "name": "close_vault",
+      "docs": ["Close the vault and return all rent + remaining tokens to authority."],
+      "discriminator": [141, 103, 17, 126, 72, 75, 29, 29],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [118, 97, 117, 108, 116, 95, 118, 50] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        { "name": "authority", "writable": true, "signer": true, "relations": ["vault_config"] },
+        { "name": "vault_token_account", "writable": true },
+        { "name": "authority_token_account", "writable": true },
+        { "name": "token_mint" },
+        { "name": "token_program" }
+      ],
+      "args": []
+    },
+    {
       "name": "freeze_vault",
       "discriminator": [
         144,

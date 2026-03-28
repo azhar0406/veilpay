@@ -255,6 +255,36 @@ pub mod veilpay {
         Ok(())
     }
 
+    /// Close the vault and return all rent + remaining tokens to authority.
+    pub fn close_vault(ctx: Context<CloseVault>) -> Result<()> {
+        // Transfer any remaining SPL tokens back to authority
+        let authority_key = ctx.accounts.vault_config.authority;
+        let bump = ctx.accounts.vault_config.bump;
+        let vault_account_info = ctx.accounts.vault_config.to_account_info();
+
+        let token_balance = ctx.accounts.vault_token_account.amount;
+        if token_balance > 0 {
+            let decimals = ctx.accounts.token_mint.decimals;
+            let seeds: &[&[u8]] = &[b"vault_v2", authority_key.as_ref(), &[bump]];
+            let signer_seeds = &[seeds];
+
+            let transfer_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.vault_token_account.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    to: ctx.accounts.authority_token_account.to_account_info(),
+                    authority: vault_account_info,
+                },
+                signer_seeds,
+            );
+            token_interface::transfer_checked(transfer_ctx, token_balance, decimals)?;
+        }
+
+        // vault_config account is closed via `close = authority` in the accounts struct
+        Ok(())
+    }
+
     pub fn freeze_vault(ctx: Context<FreezeVault>) -> Result<()> {
         ctx.accounts.vault_config.is_frozen = true;
         emit!(VaultFrozen { vault: ctx.accounts.vault_config.key(), frozen_by: ctx.accounts.authority.key() });
@@ -445,6 +475,21 @@ pub struct Deposit<'info> {
     #[account(address = INCO_LIGHTNING_ID)]
     pub inco_lightning_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseVault<'info> {
+    #[account(mut, close = authority, has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_v2", authority.key().as_ref()], bump = vault_config.bump)]
+    pub vault_config: Account<'info, VaultConfig>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = vault_config)]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = authority)]
+    pub authority_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(address = vault_config.token_mint)]
+    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 #[derive(Accounts)]
