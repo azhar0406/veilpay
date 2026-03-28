@@ -122,13 +122,14 @@
       ],
       "args": [
         { "name": "amount_ciphertext", "type": "bytes" },
-        { "name": "input_type", "type": "u8" }
+        { "name": "input_type", "type": "u8" },
+        { "name": "amount", "type": "u64" }
       ]
     },
     {
-      "name": "settle_payment",
-      "docs": ["Settle a payment: Authority decrypts amount off-chain, then calls this to release tokens."],
-      "discriminator": [129, 7, 163, 250, 122, 226, 158, 249],
+      "name": "claim_payment",
+      "docs": ["Claim payment: Recipient withdraws by proving they know the correct amount."],
+      "discriminator": [69, 112, 250, 167, 37, 156, 200, 30],
       "accounts": [
         {
           "name": "vault_config",
@@ -136,13 +137,12 @@
           "pda": {
             "seeds": [
               { "kind": "const", "value": [118, 97, 117, 108, 116, 95, 118, 50] },
-              { "kind": "account", "path": "authority" }
+              { "kind": "account", "path": "vault_config.authority", "account": "VaultConfig" }
             ]
           }
         },
         { "name": "payment_record", "writable": true },
-        { "name": "authority", "writable": true, "signer": true, "relations": ["vault_config"] },
-        { "name": "recipient" },
+        { "name": "recipient", "writable": true, "signer": true },
         { "name": "vault_token_account", "writable": true },
         { "name": "recipient_token_account", "writable": true },
         { "name": "token_mint" },

@@ -35,7 +35,7 @@ export default function VaultDashboard() {
     fetchPayments,
     grantDecryptAccess,
     grantPaymentAccess,
-    settlePayment,
+    claimPayment,
   } = useVeilPay();
 
   const [showInit, setShowInit] = useState(false);
@@ -402,7 +402,7 @@ export default function VaultDashboard() {
             )}
 
             {/* Payment History */}
-            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} settlePayment={settlePayment} />}
+            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} />}
           </div>
         )}
       </main>

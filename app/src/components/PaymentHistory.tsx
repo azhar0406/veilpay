@@ -11,17 +11,19 @@ interface Props {
   canDecrypt?: boolean;
   isAuthority?: boolean;
   grantPaymentAccess?: (paymentPda: PublicKey, handle: bigint) => Promise<void>;
-  settlePayment?: (paymentPda: PublicKey, recipient: PublicKey, amount: number) => Promise<void>;
+  claimPayment?: (paymentPda: PublicKey, amount: number) => Promise<void>;
+  connectedWallet?: PublicKey | null;
 }
 
-export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAuthority = false, grantPaymentAccess, settlePayment }: Props) {
+export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAuthority = false, grantPaymentAccess, claimPayment, connectedWallet }: Props) {
   const { publicKey, signMessage } = useWallet();
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [revealedAmounts, setRevealedAmounts] = useState<Record<string, string>>({});
   const [revealingNonce, setRevealingNonce] = useState<string | null>(null);
   const [grantingNonce, setGrantingNonce] = useState<string | null>(null);
-  const [settlingNonce, setSettlingNonce] = useState<string | null>(null);
+  const [claimingNonce, setClaimingNonce] = useState<string | null>(null);
+  const [claimAmounts, setClaimAmounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchPayments().then((data) => {
@@ -30,7 +32,6 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
     });
   }, [fetchPayments]);
 
-  // Clear revealed amounts when wallet changes
   useEffect(() => {
     setRevealedAmounts({});
     setRevealingNonce(null);
@@ -69,24 +70,19 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
     finally { setGrantingNonce(null); }
   }, [grantPaymentAccess]);
 
-  const handleSettle = useCallback(async (payment: PaymentData) => {
-    if (!settlePayment || !payment.publicKey) return;
+  const handleClaim = useCallback(async (payment: PaymentData, amountStr: string) => {
+    if (!claimPayment || !payment.publicKey) return;
+    const amount = Number(amountStr);
+    if (!amount || amount <= 0) return;
     const nonce = payment.nonce.toString();
-    const revealed = revealedAmounts[nonce];
-    if (!revealed || revealed.startsWith("Not allowed") || revealed.startsWith("Decrypt") || revealed === "N/A") {
-      return; // Must decrypt first
-    }
-    // Convert decrypted raw units to token amount (the settle expects raw units with 6 decimals)
-    const rawAmount = Number(revealed);
-    setSettlingNonce(nonce);
+    setClaimingNonce(nonce);
     try {
-      await settlePayment(payment.publicKey, payment.recipient, rawAmount);
-      // Refresh payments
+      await claimPayment(payment.publicKey, amount);
       const data = await fetchPayments();
       setPayments(data.sort((a, b) => b.nonce.toNumber() - a.nonce.toNumber()));
     } catch { /* error handled by hook */ }
-    finally { setSettlingNonce(null); }
-  }, [settlePayment, revealedAmounts, fetchPayments]);
+    finally { setClaimingNonce(null); }
+  }, [claimPayment, fetchPayments]);
 
   if (!loaded) return null;
 
@@ -118,8 +114,9 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
                 const needsAccess = revealed?.startsWith("Not allowed");
                 const isLoading = revealingNonce === nonce;
                 const isGranting = grantingNonce === nonce;
-                const isSettling = settlingNonce === nonce;
+                const isClaiming = claimingNonce === nonce;
                 const isSettled = p.isSettled;
+                const isRecipient = connectedWallet && p.recipient.equals(connectedWallet);
                 return (
                   <tr
                     key={nonce}
@@ -174,17 +171,26 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
                     <td className="py-3 pr-4">
                       {isSettled ? (
                         <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{ background: "rgba(34,197,94,0.12)", color: "#4ade80" }}>
-                          Settled
+                          Claimed
                         </span>
-                      ) : isAuthority && isRevealed && settlePayment ? (
-                        <button
-                          onClick={() => handleSettle(p)}
-                          disabled={isSettling}
-                          className="px-3 py-1 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-                          style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}
-                        >
-                          {isSettling ? "Settling..." : "Settle"}
-                        </button>
+                      ) : isRecipient && claimPayment && !isSettled ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            value={claimAmounts[nonce] || ""}
+                            onChange={(e) => setClaimAmounts((prev) => ({ ...prev, [nonce]: e.target.value }))}
+                            className="w-20 px-2 py-1 rounded text-xs font-mono bg-[var(--background)] border border-[var(--card-border)] text-white placeholder:text-[var(--muted)]/50"
+                          />
+                          <button
+                            onClick={() => handleClaim(p, claimAmounts[nonce] || "")}
+                            disabled={isClaiming || !claimAmounts[nonce]}
+                            className="px-3 py-1 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                            style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}
+                          >
+                            {isClaiming ? "Claiming..." : "Claim"}
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
                           Pending
