@@ -341,7 +341,7 @@ export default function VaultDashboard() {
           loading={loading}
         />
       )}
-      {showDeposit && (
+      {showDeposit && vault && (
         <DepositModal
           onClose={() => setShowDeposit(false)}
           onSubmit={handleDeposit}
