@@ -7,9 +7,10 @@ import { PaymentData } from "@/hooks/useVeilPay";
 
 interface Props {
   fetchPayments: () => Promise<PaymentData[]>;
+  canDecrypt?: boolean;
 }
 
-export default function PaymentHistory({ fetchPayments }: Props) {
+export default function PaymentHistory({ fetchPayments, canDecrypt = false }: Props) {
   const { publicKey, signMessage } = useWallet();
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -89,20 +90,22 @@ export default function PaymentHistory({ fetchPayments }: Props) {
                             &#128274; {formatEncryptedHandle(handle)}
                           </span>
                         )}
-                        <button
-                          onClick={() => handleRevealAmount(nonce, handle)}
-                          disabled={isLoading}
-                          className="p-0.5 rounded hover:bg-white/5 transition-colors disabled:opacity-50"
-                          title={isRevealed ? "Hide" : "Decrypt"}
-                        >
-                          {isLoading ? (
-                            <span className="inline-block w-3.5 h-3.5 rounded-full animate-spin" style={{ border: "2px solid var(--card-border)", borderTopColor: "var(--accent)" }} />
-                          ) : (
-                            <span style={{ fontSize: "14px", cursor: "pointer" }}>
-                              {isRevealed ? "\uD83D\uDC41\uFE0F" : "\uD83D\uDC41\u200D\uD83D\uDDE8\uFE0F"}
-                            </span>
-                          )}
-                        </button>
+                        {canDecrypt && (
+                          <button
+                            onClick={() => handleRevealAmount(nonce, handle)}
+                            disabled={isLoading}
+                            className="p-0.5 rounded hover:bg-white/5 transition-colors disabled:opacity-50"
+                            title={isRevealed ? "Hide" : "Decrypt"}
+                          >
+                            {isLoading ? (
+                              <span className="inline-block w-3.5 h-3.5 rounded-full animate-spin" style={{ border: "2px solid var(--card-border)", borderTopColor: "var(--accent)" }} />
+                            ) : (
+                              <span style={{ fontSize: "14px", cursor: "pointer" }}>
+                                {isRevealed ? "\uD83D\uDC41\uFE0F" : "\uD83D\uDC41\u200D\uD83D\uDDE8\uFE0F"}
+                              </span>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="py-3 text-[var(--muted)]">

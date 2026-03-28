@@ -301,20 +301,22 @@ export default function VaultDashboard() {
                         <p style={{ color: "var(--muted)", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                           {item.label}
                         </p>
-                        <button
-                          onClick={() => handleRevealValue(item.key, item.value)}
-                          disabled={isLoading}
-                          className="p-1 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50"
-                          title={isRevealed ? "Hide value" : "Decrypt & reveal"}
-                        >
-                          {isLoading ? (
-                            <span className="inline-block w-4 h-4 rounded-full animate-spin" style={{ border: "2px solid var(--card-border)", borderTopColor: "var(--accent)" }} />
-                          ) : (
-                            <span style={{ fontSize: "16px", cursor: "pointer" }}>
-                              {isRevealed ? "\uD83D\uDC41\uFE0F" : "\uD83D\uDC41\u200D\uD83D\uDDE8\uFE0F"}
-                            </span>
-                          )}
-                        </button>
+                        {(isAuthority || isAuditor) && (
+                          <button
+                            onClick={() => handleRevealValue(item.key, item.value)}
+                            disabled={isLoading}
+                            className="p-1 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50"
+                            title={isRevealed ? "Hide value" : "Decrypt & reveal"}
+                          >
+                            {isLoading ? (
+                              <span className="inline-block w-4 h-4 rounded-full animate-spin" style={{ border: "2px solid var(--card-border)", borderTopColor: "var(--accent)" }} />
+                            ) : (
+                              <span style={{ fontSize: "16px", cursor: "pointer" }}>
+                                {isRevealed ? "\uD83D\uDC41\uFE0F" : "\uD83D\uDC41\u200D\uD83D\uDDE8\uFE0F"}
+                              </span>
+                            )}
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {isRevealed ? (
@@ -392,7 +394,7 @@ export default function VaultDashboard() {
             )}
 
             {/* Payment History */}
-            {vault && <PaymentHistory fetchPayments={fetchPayments} />}
+            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} />}
           </div>
         )}
       </main>
