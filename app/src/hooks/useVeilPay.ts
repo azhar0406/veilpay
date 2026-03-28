@@ -59,23 +59,70 @@ function getProgram(wallet: any, connection: any): Program | null {
   return new Program(IDL as any, provider);
 }
 
+export interface VaultListItem {
+  publicKey: PublicKey;
+  data: VaultData;
+}
+
 export function useVeilPay() {
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
   const [vault, setVault] = useState<VaultData | null>(null);
   const [vaultPda, setVaultPda] = useState<PublicKey | null>(null);
+  const [allVaults, setAllVaults] = useState<VaultListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch vault data — auto-detect based on connected wallet
-  // 1. Check if wallet owns a vault (is authority)
-  // 2. Search all vaults to find one where wallet is auditor, whitelisted, or payment recipient
+  // Fetch all vaults from the program
+  const fetchAllVaults = useCallback(async () => {
+    if (!wallet) return;
+    const program = getProgram(wallet, connection);
+    if (!program) return;
+
+    try {
+      const vaults = await (program.account as any).vaultConfig.all();
+      setAllVaults(vaults.map((v: any) => ({ publicKey: v.publicKey, data: v.account as VaultData })));
+    } catch {
+      setAllVaults([]);
+    }
+  }, [wallet, connection]);
+
+  // Select a specific vault
+  const selectVault = useCallback((pda: PublicKey, data: VaultData) => {
+    setVault(data);
+    setVaultPda(pda);
+  }, []);
+
+  // Go back to vault list
+  const deselectVault = useCallback(() => {
+    setVault(null);
+    setVaultPda(null);
+  }, []);
+
+  // Fetch vault data — auto-detect based on connected wallet role
   const fetchVault = useCallback(async () => {
     if (!wallet) return;
     const program = getProgram(wallet, connection);
     if (!program) return;
 
-    // First: check if connected wallet is the authority of a vault
+    // Also fetch all vaults for the listing
+    fetchAllVaults();
+
+    // If a vault is already selected, refresh its data
+    if (vaultPda) {
+      try {
+        const data = await (program.account as any).vaultConfig.fetch(vaultPda);
+        setVault(data as VaultData);
+        setError(null);
+        return;
+      } catch {
+        // Vault no longer exists (closed)
+        setVault(null);
+        setVaultPda(null);
+      }
+    }
+
+    // Auto-detect: check if wallet is authority
     const [ownPda] = getVaultPda(wallet.publicKey);
     try {
       const data = await (program.account as any).vaultConfig.fetch(ownPda);
@@ -83,56 +130,12 @@ export function useVeilPay() {
       setVaultPda(ownPda);
       setError(null);
       return;
-    } catch {
-      // Not the authority — search all vaults
-    }
+    } catch { /* not authority */ }
 
-    // Second: fetch all vaults and find one where this wallet is auditor or whitelisted
-    try {
-      const allVaults = await (program.account as any).vaultConfig.all();
-      for (const v of allVaults) {
-        const data = v.account as VaultData;
-        // Check if wallet is auditor
-        if (data.auditor.equals(wallet.publicKey)) {
-          setVault(data);
-          setVaultPda(v.publicKey);
-          setError(null);
-          return;
-        }
-        // Check if wallet is whitelisted for this vault
-        const [whitelistPda] = getWhitelistPda(v.publicKey, wallet.publicKey);
-        try {
-          await (program.account as any).whitelist.fetch(whitelistPda);
-          setVault(data);
-          setVaultPda(v.publicKey);
-          setError(null);
-          return;
-        } catch {
-          // Not whitelisted for this vault
-        }
-      }
-
-      // Third: check if wallet is a recipient of any payment
-      const allPayments = await (program.account as any).paymentRecord.all();
-      for (const p of allPayments) {
-        if (p.account.recipient.equals(wallet.publicKey)) {
-          // Find the vault for this payment
-          try {
-            const data = await (program.account as any).vaultConfig.fetch(p.account.vault);
-            setVault(data as VaultData);
-            setVaultPda(p.account.vault);
-            setError(null);
-            return;
-          } catch { /* vault not found */ }
-        }
-      }
-    } catch {
-      // Search failed
-    }
-
+    // Don't auto-select — let user pick from the list
     setVault(null);
     setVaultPda(null);
-  }, [wallet, connection]);
+  }, [wallet, connection, vaultPda, fetchAllVaults]);
 
   useEffect(() => {
     fetchVault();
@@ -628,5 +631,9 @@ export function useVeilPay() {
     grantPaymentAccess,
     claimPayment,
     closeVault,
+    allVaults,
+    selectVault,
+    deselectVault,
+    fetchAllVaults,
   };
 }

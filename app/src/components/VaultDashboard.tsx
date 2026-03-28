@@ -11,7 +11,7 @@ import TransferModal from "./TransferModal";
 import WhitelistManager from "./WhitelistManager";
 import AuditorView from "./AuditorView";
 import PaymentHistory from "./PaymentHistory";
-
+import VaultList from "./VaultList";
 
 interface Toast {
   message: string;
@@ -37,6 +37,9 @@ export default function VaultDashboard() {
     grantPaymentAccess,
     claimPayment,
     closeVault,
+    allVaults,
+    selectVault,
+    deselectVault,
   } = useVeilPay();
 
   const [showInit, setShowInit] = useState(false);
@@ -204,52 +207,13 @@ export default function VaultDashboard() {
             </p>
           </div>
         ) : !vault ? (
-          /* ===== CONNECTED BUT NO VAULT ===== */
-          <div className="flex flex-col items-center justify-center min-h-[55vh] gap-8">
-            <img src="/logo.svg" alt="VeilPay" className="w-20 h-20" />
-
-            <div className="text-center max-w-md">
-              <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">
-                No Vault Found
-              </h2>
-              <p style={{ color: "var(--muted-light)", fontSize: "15px", lineHeight: "1.6" }}>
-                Create a confidential treasury vault to start managing encrypted payments.
-                You&apos;ll set an auditor and a spending limit.
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowInit(true)}
-              className="px-8 py-3.5 text-white rounded-xl font-semibold text-base transition-all hover:-translate-y-0.5"
-              style={{
-                background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-                boxShadow: "0 4px 20px rgba(59,130,246,0.3)",
-              }}
-            >
-              Create Vault
-            </button>
-
-            <div
-              className="max-w-md w-full p-4 rounded-xl text-sm"
-              style={{
-                background: "rgba(59,130,246,0.06)",
-                border: "1px solid rgba(59,130,246,0.15)",
-                color: "var(--muted-light)",
-              }}
-            >
-              <p className="font-semibold text-white mb-2">Quick Start Guide:</p>
-              <ol className="space-y-1.5" style={{ paddingLeft: "18px", listStyleType: "decimal" }}>
-                <li>Create a vault (set an auditor wallet + spending limit)</li>
-                <li>Whitelist wallets that can deposit & transfer</li>
-                <li>Deposit encrypted amounts into the vault</li>
-                <li>Send confidential transfers to recipients</li>
-              </ol>
-            </div>
-
-            {/* USX Faucet — only visible to whitelisted wallet */}
-            <div className="max-w-md w-full mt-2">
-              </div>
-          </div>
+          /* ===== VAULT LIST — browse all vaults ===== */
+          <VaultList
+            vaults={allVaults}
+            onSelect={selectVault}
+            onCreate={() => setShowInit(true)}
+            loading={loading}
+          />
         ) : (
           /* ===== VAULT EXISTS — MAIN DASHBOARD ===== */
           <div className="space-y-6">
@@ -274,6 +238,7 @@ export default function VaultDashboard() {
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
+                  <button onClick={deselectVault} className="text-sm font-medium hover:underline" style={{ color: "var(--accent)" }}>&larr; All Vaults</button>
                   <h2 className="text-lg font-bold text-white">Vault Overview</h2>
                   <span
                     className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider"
