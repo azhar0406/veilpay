@@ -11,7 +11,7 @@ import TransferModal from "./TransferModal";
 import WhitelistManager from "./WhitelistManager";
 import AuditorView from "./AuditorView";
 import PaymentHistory from "./PaymentHistory";
-import USXFaucet from "./USXFaucet";
+
 
 interface Toast {
   message: string;
@@ -195,8 +195,7 @@ export default function VaultDashboard() {
 
             {/* USX Faucet — only visible to whitelisted wallet */}
             <div className="max-w-md w-full mt-2">
-              <USXFaucet />
-            </div>
+              </div>
           </div>
         ) : (
           /* ===== VAULT EXISTS — MAIN DASHBOARD ===== */
@@ -316,7 +315,6 @@ export default function VaultDashboard() {
             </div>
 
             {/* USX Faucet — only visible to whitelisted wallet */}
-            <USXFaucet />
 
             {/* Auditor View */}
             {isAuditor && vault && vaultPda && (
