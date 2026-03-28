@@ -264,6 +264,32 @@ pub mod veilpay {
         Ok(())
     }
 
+    /// Grant decrypt access for a payment record's encrypted amount.
+    pub fn grant_payment_access<'info>(ctx: Context<'_, '_, 'info, 'info, GrantPaymentAccess<'info>>) -> Result<()> {
+        let vault = &ctx.accounts.vault_config;
+        let payment = &ctx.accounts.payment_record;
+        let inco = ctx.accounts.inco_lightning_program.to_account_info();
+        let signer = ctx.accounts.authority.to_account_info();
+        let sys = ctx.accounts.system_program.to_account_info();
+
+        let addrs = [vault.authority, vault.auditor];
+        let ra = &ctx.remaining_accounts;
+        require!(ra.len() >= 4, VeilPayError::InsufficientAccounts);
+
+        for (ai, a) in addrs.iter().enumerate() {
+            let base = ai * 2;
+            let cpi_ctx = CpiContext::new(inco.clone(), Allow {
+                allowance_account: ra[base].clone(),
+                signer: signer.clone(),
+                allowed_address: ra[base + 1].clone(),
+                system_program: sys.clone(),
+            });
+            allow(cpi_ctx, payment.encrypted_amount.0, true, *a)?;
+        }
+
+        Ok(())
+    }
+
     pub fn reset_epoch(ctx: Context<ResetEpoch>) -> Result<()> {
         let vault = &mut ctx.accounts.vault_config;
         let current_epoch = Clock::get()?.epoch;
@@ -432,6 +458,19 @@ pub struct UnfreezeVault<'info> {
 pub struct GrantDecryptAccess<'info> {
     #[account(has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_v2", authority.key().as_ref()], bump = vault_config.bump)]
     pub vault_config: Account<'info, VaultConfig>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// CHECK: Inco Lightning program
+    #[account(address = INCO_LIGHTNING_ID)]
+    pub inco_lightning_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct GrantPaymentAccess<'info> {
+    #[account(has_one = authority @ VeilPayError::Unauthorized, seeds = [b"vault_v2", authority.key().as_ref()], bump = vault_config.bump)]
+    pub vault_config: Account<'info, VaultConfig>,
+    pub payment_record: Account<'info, PaymentRecord>,
     #[account(mut)]
     pub authority: Signer<'info>,
     /// CHECK: Inco Lightning program

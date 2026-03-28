@@ -2,20 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { formatEncryptedHandle, extractHandle, decryptHandle } from "@/lib/inco";
 import { PaymentData } from "@/hooks/useVeilPay";
 
 interface Props {
   fetchPayments: () => Promise<PaymentData[]>;
   canDecrypt?: boolean;
+  isAuthority?: boolean;
+  grantPaymentAccess?: (paymentPda: PublicKey, handle: bigint) => Promise<void>;
 }
 
-export default function PaymentHistory({ fetchPayments, canDecrypt = false }: Props) {
+export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAuthority = false, grantPaymentAccess }: Props) {
   const { publicKey, signMessage } = useWallet();
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [revealedAmounts, setRevealedAmounts] = useState<Record<string, string>>({});
   const [revealingNonce, setRevealingNonce] = useState<string | null>(null);
+  const [grantingNonce, setGrantingNonce] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPayments().then((data) => {
@@ -33,13 +37,34 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false }: Pr
     setRevealingNonce(nonce);
     try {
       const result = await decryptHandle([handle], publicKey, signMessage);
-      setRevealedAmounts((prev) => ({ ...prev, [nonce]: result.plaintexts[0] }));
+      if (result.error) {
+        // If not allowed, show hint
+        setRevealedAmounts((prev) => ({ ...prev, [nonce]: "Not allowed - Grant access first" }));
+      } else {
+        setRevealedAmounts((prev) => ({ ...prev, [nonce]: result.plaintexts[0] }));
+      }
     } catch {
-      // silent
+      setRevealedAmounts((prev) => ({ ...prev, [nonce]: "Decrypt failed" }));
     } finally {
       setRevealingNonce(null);
     }
   }, [publicKey, signMessage, revealedAmounts]);
+
+  const handleGrantAccess = useCallback(async (payment: PaymentData) => {
+    if (!grantPaymentAccess || !payment.publicKey) return;
+    const handle = extractHandle(payment.encryptedAmount);
+    const nonce = payment.nonce.toString();
+    setGrantingNonce(nonce);
+    try {
+      await grantPaymentAccess(payment.publicKey, BigInt(handle));
+      // After granting, clear any previous failed attempt
+      setRevealedAmounts((prev) => { const n = { ...prev }; delete n[nonce]; return n; });
+    } catch {
+      // error handled by hook
+    } finally {
+      setGrantingNonce(null);
+    }
+  }, [grantPaymentAccess]);
 
   if (!loaded) return null;
 
@@ -65,8 +90,11 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false }: Pr
               {payments.map((p) => {
                 const nonce = p.nonce.toString();
                 const handle = extractHandle(p.encryptedAmount);
-                const isRevealed = !!revealedAmounts[nonce];
+                const revealed = revealedAmounts[nonce];
+                const isRevealed = !!revealed && !revealed.startsWith("Not allowed") && !revealed.startsWith("Decrypt failed");
+                const needsAccess = revealed?.startsWith("Not allowed");
                 const isLoading = revealingNonce === nonce;
+                const isGranting = grantingNonce === nonce;
                 return (
                   <tr
                     key={nonce}
@@ -83,7 +111,7 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false }: Pr
                       <div className="inline-flex items-center gap-2">
                         {isRevealed ? (
                           <span className="font-mono font-semibold" style={{ color: "#4ade80" }}>
-                            &#128275; {revealedAmounts[nonce]}
+                            &#128275; {revealed}
                           </span>
                         ) : (
                           <span className="text-[var(--muted)]">
@@ -104,6 +132,16 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false }: Pr
                                 {isRevealed ? "\uD83D\uDC41\uFE0F" : "\uD83D\uDC41\u200D\uD83D\uDDE8\uFE0F"}
                               </span>
                             )}
+                          </button>
+                        )}
+                        {needsAccess && isAuthority && grantPaymentAccess && (
+                          <button
+                            onClick={() => handleGrantAccess(p)}
+                            disabled={isGranting}
+                            className="px-2 py-0.5 rounded text-xs font-semibold transition-colors disabled:opacity-50"
+                            style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.3)" }}
+                          >
+                            {isGranting ? "Granting..." : "Grant Access"}
                           </button>
                         )}
                       </div>

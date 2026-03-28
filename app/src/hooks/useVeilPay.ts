@@ -40,6 +40,7 @@ export interface VaultData {
 }
 
 export interface PaymentData {
+  publicKey?: PublicKey;
   vault: PublicKey;
   sender: PublicKey;
   recipient: PublicKey;
@@ -392,7 +393,7 @@ export function useVeilPay() {
           },
         },
       ]);
-      return accounts.map((a: { account: PaymentData }) => a.account);
+      return accounts.map((a: { publicKey: PublicKey; account: PaymentData }) => ({ ...a.account, publicKey: a.publicKey }));
     } catch {
       return [];
     }
@@ -449,6 +450,50 @@ export function useVeilPay() {
     }
   }, [wallet, connection, vaultPda, vault]);
 
+  // Grant decrypt access for a specific payment record
+  const grantPaymentAccess = useCallback(async (paymentPda: PublicKey, encryptedAmountHandle: bigint) => {
+    const program = getProgram(wallet, connection);
+    if (!program || !wallet || !vaultPda || !vault) {
+      setError("Wallet not connected or vault not found");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [freshVaultPda] = getVaultPda(wallet.publicKey);
+      const addrs = [vault.authority, vault.auditor];
+
+      const remainingAccounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
+      for (const addr of addrs) {
+        const [allowancePda] = getAllowancePda(encryptedAmountHandle, addr);
+        remainingAccounts.push({ pubkey: allowancePda, isSigner: false, isWritable: true });
+        remainingAccounts.push({ pubkey: addr, isSigner: false, isWritable: false });
+      }
+
+      await (program.methods as any)
+        .grantPaymentAccess()
+        .accounts({
+          vaultConfig: freshVaultPda,
+          paymentRecord: paymentPda,
+          authority: wallet.publicKey,
+          incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts(remainingAccounts)
+        .rpc();
+
+    } catch (err: unknown) {
+      if (isUserRejection(err)) { setLoading(false); return; }
+      const msg = err instanceof Error ? err.message : "Grant payment access failed";
+      setError(msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [wallet, connection, vaultPda, vault]);
+
   return {
     wallet,
     vault,
@@ -464,5 +509,6 @@ export function useVeilPay() {
     fetchPayments,
     fetchVault,
     grantDecryptAccess,
+    grantPaymentAccess,
   };
 }

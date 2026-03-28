@@ -647,6 +647,57 @@
       "args": []
     },
     {
+      "name": "grant_payment_access",
+      "docs": [
+        "Grant decrypt access for a payment record's encrypted amount."
+      ],
+      "discriminator": [193, 224, 52, 77, 35, 76, 56, 211],
+      "accounts": [
+        {
+          "name": "vault_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payment_record"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": ["vault_config"]
+        },
+        {
+          "name": "inco_lightning_program",
+          "address": "5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "freeze_vault",
       "discriminator": [
         144,

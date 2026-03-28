@@ -34,6 +34,7 @@ export default function VaultDashboard() {
     removeFromWhitelist,
     fetchPayments,
     grantDecryptAccess,
+    grantPaymentAccess,
   } = useVeilPay();
 
   const [showInit, setShowInit] = useState(false);
@@ -394,7 +395,7 @@ export default function VaultDashboard() {
             )}
 
             {/* Payment History */}
-            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} />}
+            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} />}
           </div>
         )}
       </main>
