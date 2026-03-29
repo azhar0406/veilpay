@@ -40,6 +40,7 @@ export default function VaultDashboard() {
     allVaults,
     selectVault,
     deselectVault,
+    fetchAllVaults,
   } = useVeilPay();
 
   const [showInit, setShowInit] = useState(false);
@@ -151,9 +152,10 @@ export default function VaultDashboard() {
     try {
       await closeVault();
       deselectVault();
+      await fetchAllVaults();
       showToast("Vault closed — tokens returned", "success");
     } catch { showToast("Close vault failed", "error"); }
-  }, [closeVault, deselectVault, showToast]);
+  }, [closeVault, deselectVault, fetchAllVaults, showToast]);
 
   const handleGrantAccess = useCallback(async () => {
     try {
