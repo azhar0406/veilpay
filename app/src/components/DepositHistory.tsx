@@ -42,12 +42,28 @@ export default function DepositHistory({ vaultPda, vault, onMyTotalChange, myTra
     const fetchDeposits = async () => {
       setLoading(true);
       try {
+        // Find vault creation time to filter out old deposits from previous vaults
+        let vaultCreatedAt = 0;
+        const vaultSigs = await connection.getSignaturesForAddress(vaultPda, { limit: 50 }, "confirmed");
+        for (const sig of vaultSigs) {
+          try {
+            const tx = await connection.getParsedTransaction(sig.signature, { maxSupportedTransactionVersion: 0 });
+            if (tx?.meta?.logMessages?.some(l => l.includes("Instruction: InitializeVault"))) {
+              vaultCreatedAt = sig.blockTime || 0;
+              break;
+            }
+          } catch { /* skip */ }
+        }
+
         // Fetch recent transactions for the vault
-        const sigs = await connection.getSignaturesForAddress(vaultPda, { limit: 50 }, "confirmed");
+        const sigs = vaultSigs;
         const entries: DepositEntry[] = [];
 
         for (const sig of sigs) {
           try {
+            // Skip transactions before vault creation
+            if (vaultCreatedAt && sig.blockTime && sig.blockTime < vaultCreatedAt) continue;
+
             const tx = await connection.getParsedTransaction(sig.signature, { maxSupportedTransactionVersion: 0 });
             if (!tx?.meta?.logMessages) continue;
 
