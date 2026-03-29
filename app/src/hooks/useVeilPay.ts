@@ -181,7 +181,11 @@ export function useVeilPay() {
           })
           .rpc();
 
-        await refreshSelectedVault();
+        // Fetch the new vault and select it
+        const data = await (program.account as any).vaultConfig.fetch(vPda);
+        setVault(data as VaultData);
+        setVaultPda(vPda);
+        fetchAllVaults();
       } catch (err: unknown) {
         const msg =
           err instanceof Error ? err.message : "Failed to initialize vault";
