@@ -412,7 +412,7 @@ pub struct InitializeVault<'info> {
     pub authority: Signer<'info>,
     pub token_mint: InterfaceAccount<'info, Mint>,
     #[account(
-        init,
+        init_if_needed,
         payer = authority,
         associated_token::mint = token_mint,
         associated_token::authority = vault_config,
