@@ -418,9 +418,6 @@ export function useVeilPay() {
     try {
       // Always derive PDA fresh from the connected wallet to avoid stale state
       const [freshVaultPda] = getVaultPda(wallet.publicKey);
-      console.log("DEBUG freeze - wallet:", wallet.publicKey.toBase58());
-      console.log("DEBUG freeze - freshVaultPda:", freshVaultPda.toBase58());
-      console.log("DEBUG freeze - vault.authority:", vault.authority.toBase58());
       const method = vault.isFrozen ? "unfreezeVault" : "freezeVault";
       await (program.methods as any)
         [method]()

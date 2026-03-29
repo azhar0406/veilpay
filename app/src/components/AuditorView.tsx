@@ -24,34 +24,37 @@ export default function AuditorView({ vault }: Props) {
     setRevealing(true);
     setDecryptError(null);
 
-    try {
-      const handles = [
-        extractHandle(vault.encryptedBalance),
-        extractHandle(vault.encryptedSpendingLimit),
-        extractHandle(vault.encryptedSpentThisEpoch),
-      ];
+    const labels = ["Balance", "Spending Limit", "Epoch Spent"];
+    const handles = [
+      extractHandle(vault.encryptedBalance),
+      extractHandle(vault.encryptedSpendingLimit),
+      extractHandle(vault.encryptedSpentThisEpoch),
+    ];
+    const setters = [setDecryptedBalance, setDecryptedLimit, setDecryptedSpent];
+    const errors: string[] = [];
 
-      console.log("Decrypting handles:", handles);
-
-      const result = await decryptHandle(
-        handles,
-        wallet.publicKey,
-        wallet.signMessage
-      );
-
-      if (result.error) {
-        setDecryptError(result.error);
+    // Decrypt each handle individually so partial results work
+    for (let i = 0; i < handles.length; i++) {
+      try {
+        const result = await decryptHandle([handles[i]], wallet.publicKey, wallet.signMessage);
+        if (result.error) {
+          errors.push(`${labels[i]}: ${result.error}`);
+          setters[i](result.plaintexts[0]);
+        } else {
+          setters[i](result.plaintexts[0]);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${labels[i]}: ${msg}`);
+        setters[i]("N/A");
       }
-
-      setDecryptedBalance(result.plaintexts[0]);
-      setDecryptedLimit(result.plaintexts[1]);
-      setDecryptedSpent(result.plaintexts[2]);
-    } catch (err) {
-      console.error("Decryption failed:", err);
-      setDecryptError(err instanceof Error ? err.message : "Decryption failed");
-    } finally {
-      setRevealing(false);
     }
+
+    if (errors.length > 0) {
+      setDecryptError(errors.join("\n"));
+    }
+
+    setRevealing(false);
   };
 
   return (
@@ -91,11 +94,10 @@ export default function AuditorView({ vault }: Props) {
             color: "#fbbf24",
           }}
         >
-          <p className="font-semibold mb-1">Inco Covalidator Response:</p>
-          <p className="text-xs" style={{ color: "#d4a017" }}>{decryptError}</p>
+          <p className="font-semibold mb-1">Partial decryption:</p>
+          <p className="text-xs whitespace-pre-line" style={{ color: "#d4a017" }}>{decryptError}</p>
           <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>
-            Note: Decryption requires the Inco covalidator network to be active on devnet.
-            If this is a beta limitation, the handles above are the on-chain proof of encrypted data.
+            Some handles may need &quot;Grant Access&quot; to be clicked first by the authority.
           </p>
         </div>
       )}
@@ -106,29 +108,32 @@ export default function AuditorView({ vault }: Props) {
             { label: "Vault Balance", value: decryptedBalance },
             { label: "Spending Limit", value: decryptedLimit },
             { label: "Epoch Spent", value: decryptedSpent },
-          ].map((item, i) => (
-            <div
-              key={i}
-              className="rounded-xl p-4"
-              style={{
-                background: "var(--surface)",
-                border: `1px solid ${decryptError ? "rgba(245,158,11,0.2)" : "rgba(34,197,94,0.3)"}`,
-              }}
-            >
-              <p style={{ color: "var(--muted)", fontSize: "11px", marginBottom: "4px" }}>
-                {item.label}
-              </p>
-              <div className="flex items-center gap-2">
-                <span>{decryptError ? "\u{1F512}" : "\u{1F513}"}</span>
-                <span
-                  className="text-xl font-bold"
-                  style={{ color: decryptError ? "#fbbf24" : "#4ade80" }}
-                >
-                  {item.value}
-                </span>
+          ].map((item, i) => {
+            const isNA = item.value === "N/A";
+            return (
+              <div
+                key={i}
+                className="rounded-xl p-4"
+                style={{
+                  background: "var(--surface)",
+                  border: `1px solid ${isNA ? "rgba(245,158,11,0.2)" : "rgba(34,197,94,0.3)"}`,
+                }}
+              >
+                <p style={{ color: "var(--muted)", fontSize: "11px", marginBottom: "4px" }}>
+                  {item.label}
+                </p>
+                <div className="flex items-center gap-2">
+                  <span>{isNA ? "\u{1F512}" : "\u{1F513}"}</span>
+                  <span
+                    className="text-xl font-bold"
+                    style={{ color: isNA ? "#fbbf24" : "#4ade80" }}
+                  >
+                    {item.value}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="text-sm" style={{ color: "var(--muted)" }}>
