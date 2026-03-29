@@ -490,7 +490,7 @@ pub struct ConfidentialTransfer<'info> {
     pub vault_config: Account<'info, VaultConfig>,
     #[account(seeds = [b"whitelist", vault_config.key().as_ref(), sender.key().as_ref()], bump = whitelist.bump)]
     pub whitelist: Account<'info, Whitelist>,
-    #[account(init, payer = sender, space = PaymentRecord::LEN, seeds = [b"payment", vault_config.key().as_ref(), &vault_config.payment_nonce.to_le_bytes()], bump)]
+    #[account(init_if_needed, payer = sender, space = PaymentRecord::LEN, seeds = [b"payment", vault_config.key().as_ref(), &vault_config.payment_nonce.to_le_bytes()], bump)]
     pub payment_record: Account<'info, PaymentRecord>,
     #[account(mut)]
     pub sender: Signer<'info>,
