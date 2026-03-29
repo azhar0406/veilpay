@@ -129,9 +129,9 @@ export default function VaultDashboard() {
     } catch { showToast("Deposit failed", "error"); throw new Error("failed"); }
   }, [deposit, showToast]);
 
-  const handleTransfer = useCallback(async (recipient: string, amount: number) => {
+  const handleTransfer = useCallback(async (recipient: string, amount: number, memo?: string) => {
     try {
-      await transfer(recipient, amount);
+      await transfer(recipient, amount, memo);
       showToast(`Transferred ${amount} successfully`, "success");
       setPaymentRefreshKey((k) => k + 1);
     } catch { showToast("Transfer failed", "error"); throw new Error("failed"); }
