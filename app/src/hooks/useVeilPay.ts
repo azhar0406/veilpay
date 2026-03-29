@@ -167,7 +167,15 @@ export function useVeilPay() {
           BigInt(spendingLimit)
         );
 
-        await (program.methods as any)
+        console.log("DEBUG initVault - wallet:", wallet.publicKey.toBase58());
+        console.log("DEBUG initVault - vaultPda:", vPda.toBase58());
+        console.log("DEBUG initVault - auditor:", auditor.toBase58());
+        console.log("DEBUG initVault - mint:", mint.toBase58());
+        console.log("DEBUG initVault - vaultTokenAccount:", vaultTokenAccount.toBase58());
+        console.log("DEBUG initVault - spendingLimit:", spendingLimit);
+        console.log("DEBUG initVault - ciphertext len:", ciphertext.length);
+
+        const sig = await (program.methods as any)
           .initializeVault(auditor, Buffer.from(ciphertext), inputType)
           .accounts({
             vaultConfig: vPda,
@@ -181,12 +189,15 @@ export function useVeilPay() {
           })
           .rpc();
 
+        console.log("DEBUG initVault - SUCCESS tx:", sig);
+
         // Fetch the new vault and select it
         const data = await (program.account as any).vaultConfig.fetch(vPda);
         setVault(data as VaultData);
         setVaultPda(vPda);
         fetchAllVaults();
       } catch (err: unknown) {
+        console.error("DEBUG initVault - ERROR:", err);
         const msg =
           err instanceof Error ? err.message : "Failed to initialize vault";
         setError(msg);
