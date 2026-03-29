@@ -76,15 +76,12 @@ export default function DepositHistory({ vaultPda, vault, onMyTotalChange }: Pro
           } catch { /* skip failed tx parse */ }
         }
 
-        setDeposits(entries);
-
-        // Calculate my total
-        if (publicKey) {
-          const mine = entries.filter(d => d.depositor === publicKey.toBase58());
-          const total = mine.reduce((sum, d) => sum + d.amount, 0);
-          setMyTotal(total);
-          onMyTotalChange?.(total);
-        }
+        // Only show connected user's deposits
+        const mine = publicKey ? entries.filter(d => d.depositor === publicKey.toBase58()) : [];
+        setDeposits(mine);
+        const total = mine.reduce((sum, d) => sum + d.amount, 0);
+        setMyTotal(total);
+        onMyTotalChange?.(total);
       } catch { /* ignore */ }
       finally { setLoading(false); }
     };
