@@ -489,11 +489,19 @@ export function useVeilPay() {
           },
         },
       ]);
-      return accounts.map((a: { publicKey: PublicKey; account: PaymentData }) => ({ ...a.account, publicKey: a.publicKey }));
+      // Filter: only show payment records with nonce < vault's current paymentNonce
+      // This excludes leftover records from previously closed vaults
+      const currentNonce = vault?.paymentNonce?.toNumber?.() ?? 0;
+      return accounts
+        .map((a: { publicKey: PublicKey; account: PaymentData }) => ({ ...a.account, publicKey: a.publicKey }))
+        .filter((p: PaymentData) => {
+          const n = p.nonce?.toNumber?.() ?? Number(p.nonce);
+          return n < currentNonce;
+        });
     } catch {
       return [];
     }
-  }, [wallet, connection, vaultPda]);
+  }, [wallet, connection, vaultPda, vault]);
 
   // Claim a payment — recipient clicks claim, amount read from payment record
   const claimPayment = useCallback(
