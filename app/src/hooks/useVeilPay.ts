@@ -473,6 +473,9 @@ export function useVeilPay() {
     try {
       const accounts = await (program.account as any).paymentRecord.all([
         {
+          dataSize: 306, // Filter out old payment records with wrong struct size
+        },
+        {
           memcmp: {
             offset: 8,
             bytes: vaultPda.toBase58(),
