@@ -13,9 +13,10 @@ interface Props {
   grantPaymentAccess?: (paymentPda: PublicKey, handle: bigint) => Promise<void>;
   claimPayment?: (paymentPda: PublicKey, amount: number) => Promise<void>;
   connectedWallet?: PublicKey | null;
+  refreshKey?: number;
 }
 
-export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAuthority = false, grantPaymentAccess, claimPayment, connectedWallet }: Props) {
+export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAuthority = false, grantPaymentAccess, claimPayment, connectedWallet, refreshKey = 0 }: Props) {
   const { publicKey, signMessage } = useWallet();
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -30,7 +31,7 @@ export default function PaymentHistory({ fetchPayments, canDecrypt = false, isAu
       setPayments(data.sort((a, b) => b.nonce.toNumber() - a.nonce.toNumber()));
       setLoaded(true);
     });
-  }, [fetchPayments]);
+  }, [fetchPayments, refreshKey]);
 
   useEffect(() => {
     setRevealedAmounts({});

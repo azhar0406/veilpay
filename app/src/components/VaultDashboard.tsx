@@ -48,6 +48,7 @@ export default function VaultDashboard() {
   const [showWhitelist, setShowWhitelist] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [myDeposits, setMyDeposits] = useState(0);
+  const [paymentRefreshKey, setPaymentRefreshKey] = useState(0);
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
 
@@ -104,6 +105,7 @@ export default function VaultDashboard() {
     try {
       await transfer(recipient, amount);
       showToast(`Transferred ${amount} successfully`, "success");
+      setPaymentRefreshKey((k) => k + 1);
     } catch { showToast("Transfer failed", "error"); throw new Error("failed"); }
   }, [transfer, showToast]);
 
@@ -385,7 +387,7 @@ export default function VaultDashboard() {
             {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} onMyTotalChange={setMyDeposits} />}
 
             {/* Payment History */}
-            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} />}
+            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} refreshKey={paymentRefreshKey} />}
           </div>
         )}
       </main>
