@@ -477,11 +477,18 @@ pub struct CloseVault<'info> {
     pub authority: Signer<'info>,
     #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = vault_config)]
     pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut, associated_token::mint = vault_config.token_mint, associated_token::authority = authority)]
+    #[account(
+        init_if_needed,
+        payer = authority,
+        associated_token::mint = token_mint,
+        associated_token::authority = authority,
+    )]
     pub authority_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(address = vault_config.token_mint)]
     pub token_mint: InterfaceAccount<'info, Mint>,
     pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

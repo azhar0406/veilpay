@@ -425,6 +425,8 @@ export function useVeilPay() {
           authorityTokenAccount,
           tokenMint: mint,
           tokenProgram: getTokenProgramId(mint),
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
         })
         .rpc();
 
