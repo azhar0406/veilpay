@@ -12,6 +12,15 @@ import WhitelistManager from "./WhitelistManager";
 import PaymentHistory from "./PaymentHistory";
 import DepositHistory from "./DepositHistory";
 import VaultList from "./VaultList";
+import { USDC_MINT, USDT_MINT } from "@/lib/anchor";
+
+function formatDecryptedValue(raw: string, tokenMint?: any): string {
+  const num = Number(raw);
+  if (isNaN(num) || raw === "N/A") return raw;
+  const uiAmount = num / 1_000_000;
+  const name = tokenMint?.equals?.(USDC_MINT) ? "USDC" : tokenMint?.equals?.(USDT_MINT) ? "USDT" : "";
+  return `${uiAmount} ${name}`.trim();
+}
 
 interface Toast {
   message: string;
@@ -337,7 +346,7 @@ export default function VaultDashboard() {
                           <>
                             <span style={{ fontSize: "16px" }}>&#128275;</span>
                             <span className="text-lg font-mono font-semibold" style={{ color: "#4ade80" }}>
-                              {revealedValues[item.key]}
+                              {formatDecryptedValue(revealedValues[item.key], vault.tokenMint)}
                             </span>
                           </>
                         ) : (
