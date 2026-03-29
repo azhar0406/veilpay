@@ -429,7 +429,7 @@ pub struct InitializeVault<'info> {
 #[derive(Accounts)]
 #[instruction(wallet: Pubkey)]
 pub struct AddToWhitelist<'info> {
-    #[account(init, payer = authority, space = Whitelist::LEN, seeds = [b"whitelist", vault_config.key().as_ref(), wallet.as_ref()], bump)]
+    #[account(init_if_needed, payer = authority, space = Whitelist::LEN, seeds = [b"whitelist", vault_config.key().as_ref(), wallet.as_ref()], bump)]
     pub whitelist: Account<'info, Whitelist>,
     #[account(has_one = authority @ VeilPayError::Unauthorized)]
     pub vault_config: Account<'info, VaultConfig>,
