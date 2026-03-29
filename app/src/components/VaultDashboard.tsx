@@ -47,6 +47,7 @@ export default function VaultDashboard() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showWhitelist, setShowWhitelist] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [myDeposits, setMyDeposits] = useState(0);
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
 
@@ -381,7 +382,7 @@ export default function VaultDashboard() {
             {/* USX Faucet — only visible to whitelisted wallet */}
 
             {/* Deposit History */}
-            {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} />}
+            {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} onMyTotalChange={setMyDeposits} />}
 
             {/* Payment History */}
             {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} />}
@@ -411,11 +412,13 @@ export default function VaultDashboard() {
           tokenMint={vault.tokenMint}
         />
       )}
-      {showTransfer && (
+      {showTransfer && vault && (
         <TransferModal
           onClose={() => setShowTransfer(false)}
           onSubmit={handleTransfer}
           loading={loading}
+          myDeposits={myDeposits}
+          tokenMint={vault.tokenMint}
         />
       )}
       {showWhitelist && vaultPda && (

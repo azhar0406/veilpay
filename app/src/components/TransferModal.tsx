@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { PublicKey } from "@solana/web3.js";
+import { USDC_MINT, USDT_MINT } from "@/lib/anchor";
 
 interface Props {
   onClose: () => void;
   onSubmit: (recipient: string, amount: number) => Promise<void>;
   loading: boolean;
+  myDeposits: number;
+  tokenMint: PublicKey;
 }
 
 function isValidSolanaAddress(addr: string): boolean {
@@ -18,10 +21,17 @@ function isValidSolanaAddress(addr: string): boolean {
   }
 }
 
-export default function TransferModal({ onClose, onSubmit, loading }: Props) {
+function getTokenName(mint: PublicKey): string {
+  if (mint.equals(USDC_MINT)) return "USDC";
+  if (mint.equals(USDT_MINT)) return "USDT";
+  return "Token";
+}
+
+export default function TransferModal({ onClose, onSubmit, loading, myDeposits, tokenMint }: Props) {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [localError, setLocalError] = useState("");
+  const tokenName = getTokenName(tokenMint);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +42,18 @@ export default function TransferModal({ onClose, onSubmit, loading }: Props) {
       setLocalError("Enter a valid Solana wallet address (base58)");
       return;
     }
-    if (!amount || Number(amount) <= 0) {
+    const num = Number(amount);
+    if (!amount || num <= 0) {
       setLocalError("Enter a valid amount");
+      return;
+    }
+    if (num > myDeposits) {
+      setLocalError(`Insufficient balance. You have ${myDeposits} ${tokenName}`);
       return;
     }
 
     try {
-      await onSubmit(trimmed, Number(amount));
+      await onSubmit(trimmed, num);
       onClose();
     } catch (err: unknown) {
       setLocalError(err instanceof Error ? err.message : "Transfer failed");
@@ -51,6 +66,14 @@ export default function TransferModal({ onClose, onSubmit, loading }: Props) {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-bold text-white">Confidential Transfer</h3>
           <button onClick={onClose} className="text-[var(--muted)] hover:text-white text-xl">&times;</button>
+        </div>
+
+        {/* My Balance */}
+        <div className="bg-[var(--background)] border border-[var(--card-border)] rounded-lg p-3 mb-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[var(--muted)]">My Deposited Balance</span>
+            <span className="text-white font-mono font-semibold">{myDeposits} {tokenName}</span>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -66,23 +89,38 @@ export default function TransferModal({ onClose, onSubmit, loading }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm text-[var(--muted)] mb-1.5">Amount</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Amount to transfer"
-              min="1"
-              className="w-full bg-[var(--background)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-white text-sm font-mono placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--accent)]"
-            />
+            <label className="block text-sm text-[var(--muted)] mb-1.5">Amount ({tokenName})</label>
+            <div className="relative">
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                min="0.000001"
+                step="any"
+                className="w-full bg-[var(--background)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-white text-sm font-mono placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--accent)]"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--muted)]">
+                {tokenName}
+              </span>
+            </div>
+            {myDeposits > 0 && (
+              <button
+                type="button"
+                onClick={() => setAmount(String(myDeposits))}
+                className="text-xs text-[var(--accent)] mt-1 hover:underline"
+              >
+                Max: {myDeposits} {tokenName}
+              </button>
+            )}
           </div>
 
           <div className="bg-[var(--background)] border border-[var(--card-border)] rounded-lg p-3">
             <div className="flex items-center gap-2 text-sm">
               <span>&#128274;</span>
               <span className="text-[var(--muted)]">
-                Transfer amount is <span className="text-[var(--accent)]">fully encrypted</span>.
-                Spending limits are enforced on encrypted values.
+                Transfer is <span className="text-[var(--accent)]">fully encrypted</span>. No token movement on-chain.
+                Recipient claims later with the amount you share.
               </span>
             </div>
           </div>
@@ -93,10 +131,10 @@ export default function TransferModal({ onClose, onSubmit, loading }: Props) {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || myDeposits === 0}
             className="w-full py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl font-medium transition-colors disabled:opacity-50"
           >
-            {loading ? "Encrypting & Transferring..." : "Send Transfer"}
+            {loading ? "Encrypting & Transferring..." : `Transfer ${amount || "0"} ${tokenName}`}
           </button>
         </form>
       </div>

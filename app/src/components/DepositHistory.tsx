@@ -16,6 +16,7 @@ interface DepositEntry {
 interface Props {
   vaultPda: PublicKey;
   vault: VaultData;
+  onMyTotalChange?: (total: number) => void;
 }
 
 function getTokenName(mint: PublicKey): string {
@@ -28,7 +29,7 @@ function truncate(key: string): string {
   return key.slice(0, 4) + "..." + key.slice(-4);
 }
 
-export default function DepositHistory({ vaultPda, vault }: Props) {
+export default function DepositHistory({ vaultPda, vault, onMyTotalChange }: Props) {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [deposits, setDeposits] = useState<DepositEntry[]>([]);
@@ -80,7 +81,9 @@ export default function DepositHistory({ vaultPda, vault }: Props) {
         // Calculate my total
         if (publicKey) {
           const mine = entries.filter(d => d.depositor === publicKey.toBase58());
-          setMyTotal(mine.reduce((sum, d) => sum + d.amount, 0));
+          const total = mine.reduce((sum, d) => sum + d.amount, 0);
+          setMyTotal(total);
+          onMyTotalChange?.(total);
         }
       } catch { /* ignore */ }
       finally { setLoading(false); }
