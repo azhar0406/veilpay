@@ -91,7 +91,7 @@ export function getPaymentPda(
     n = Math.floor(n / 256);
   }
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("payment"), vault.toBuffer(), Buffer.from(nonceBuffer)],
+    [Buffer.from("pay_v2"), vault.toBuffer(), Buffer.from(nonceBuffer)],
     PROGRAM_ID
   );
 }

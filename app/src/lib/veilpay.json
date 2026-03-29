@@ -109,7 +109,7 @@
           "writable": true,
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [112, 97, 121, 109, 101, 110, 116] },
+              { "kind": "const", "value": [112, 97, 121, 95, 118, 50] },
               { "kind": "account", "path": "vault_config" },
               { "kind": "account", "path": "vault_config.payment_nonce", "account": "VaultConfig" }
             ]
