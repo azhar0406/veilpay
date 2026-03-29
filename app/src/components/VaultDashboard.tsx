@@ -10,6 +10,7 @@ import DepositModal from "./DepositModal";
 import TransferModal from "./TransferModal";
 import WhitelistManager from "./WhitelistManager";
 import PaymentHistory from "./PaymentHistory";
+import DepositHistory from "./DepositHistory";
 import VaultList from "./VaultList";
 
 interface Toast {
@@ -378,6 +379,9 @@ export default function VaultDashboard() {
             </div>
 
             {/* USX Faucet — only visible to whitelisted wallet */}
+
+            {/* Deposit History */}
+            {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} />}
 
             {/* Payment History */}
             {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} />}
