@@ -123,12 +123,13 @@
       "args": [
         { "name": "amount_ciphertext", "type": "bytes" },
         { "name": "input_type", "type": "u8" },
-        { "name": "amount", "type": "u64" }
+        { "name": "amount", "type": "u64" },
+        { "name": "memo", "type": "bytes" }
       ]
     },
     {
       "name": "claim_payment",
-      "docs": ["Claim payment: Recipient withdraws by proving they know the correct amount."],
+      "docs": ["Claim payment: Recipient withdraws their allocated tokens."],
       "discriminator": [69, 112, 250, 167, 37, 156, 200, 30],
       "accounts": [
         {
@@ -148,9 +149,7 @@
         { "name": "token_mint" },
         { "name": "token_program" }
       ],
-      "args": [
-        { "name": "amount", "type": "u64" }
-      ]
+      "args": []
     },
     {
       "name": "deposit",
@@ -1124,9 +1123,13 @@
             "type": "bool"
           },
           {
-            "name": "amount_hash",
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "memo",
             "type": {
-              "array": ["u8", 32]
+              "array": ["u8", 128]
             }
           }
         ]

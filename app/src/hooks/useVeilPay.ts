@@ -49,6 +49,8 @@ export interface PaymentData {
   nonce: BN;
   bump: number;
   isSettled: boolean;
+  amount: BN;
+  memo: number[];
 }
 
 function getProgram(wallet: any, connection: any): Program | null {
@@ -318,7 +320,7 @@ export function useVeilPay() {
 
   // Confidential transfer — TEE encrypted state only, no token movement
   const transfer = useCallback(
-    async (recipientAddress: string, amount: number) => {
+    async (recipientAddress: string, amount: number, memo?: string) => {
       const program = getProgram(wallet, connection);
       if (!program || !wallet || !vaultPda || !vault) {
         setError("Wallet not connected or vault not found");
@@ -338,8 +340,14 @@ export function useVeilPay() {
         // amount in token smallest unit (6 decimals for USDC/USDT)
         const tokenAmount = new BN(amount).mul(new BN(10).pow(new BN(6)));
 
+        const memoBytes = Buffer.alloc(128);
+        if (memo) {
+          const encoded = new TextEncoder().encode(memo.slice(0, 128));
+          memoBytes.set(encoded, 0);
+        }
+
         await (program.methods as any)
-          .confidentialTransfer(Buffer.from(ciphertext), inputType, tokenAmount)
+          .confidentialTransfer(Buffer.from(ciphertext), inputType, tokenAmount, memoBytes)
           .accounts({
             vaultConfig: vaultPda,
             whitelist: whitelistPda,
@@ -458,9 +466,9 @@ export function useVeilPay() {
     }
   }, [wallet, connection, vaultPda]);
 
-  // Claim a payment — recipient withdraws by proving they know the amount
+  // Claim a payment — recipient clicks claim, amount read from payment record
   const claimPayment = useCallback(
-    async (paymentPda: PublicKey, amount: number) => {
+    async (paymentPda: PublicKey) => {
       const program = getProgram(wallet, connection);
       if (!program || !wallet || !vaultPda || !vault) {
         setError("Wallet not connected or vault not found");
@@ -489,11 +497,8 @@ export function useVeilPay() {
           await connection.confirmTransaction(sig, "confirmed");
         }
 
-        // amount in token smallest unit (6 decimals)
-        const tokenAmount = new BN(amount).mul(new BN(10).pow(new BN(6)));
-
         await (program.methods as any)
-          .claimPayment(tokenAmount)
+          .claimPayment()
           .accounts({
             vaultConfig: vaultPda,
             paymentRecord: paymentPda,

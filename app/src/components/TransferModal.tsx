@@ -6,7 +6,7 @@ import { USDC_MINT, USDT_MINT } from "@/lib/anchor";
 
 interface Props {
   onClose: () => void;
-  onSubmit: (recipient: string, amount: number) => Promise<void>;
+  onSubmit: (recipient: string, amount: number, memo?: string) => Promise<void>;
   loading: boolean;
   myDeposits: number;
   tokenMint: PublicKey;
@@ -30,6 +30,7 @@ function getTokenName(mint: PublicKey): string {
 export default function TransferModal({ onClose, onSubmit, loading, myDeposits, tokenMint }: Props) {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
   const [localError, setLocalError] = useState("");
   const tokenName = getTokenName(tokenMint);
 
@@ -53,7 +54,7 @@ export default function TransferModal({ onClose, onSubmit, loading, myDeposits, 
     }
 
     try {
-      await onSubmit(trimmed, num);
+      await onSubmit(trimmed, num, memo || undefined);
       onClose();
     } catch (err: unknown) {
       setLocalError(err instanceof Error ? err.message : "Transfer failed");
@@ -115,12 +116,24 @@ export default function TransferModal({ onClose, onSubmit, loading, myDeposits, 
             )}
           </div>
 
+          <div>
+            <label className="block text-sm text-[var(--muted)] mb-1.5">Message (optional)</label>
+            <input
+              type="text"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="e.g. Payment for March invoice"
+              maxLength={128}
+              className="w-full bg-[var(--background)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+
           <div className="bg-[var(--background)] border border-[var(--card-border)] rounded-lg p-3">
             <div className="flex items-center gap-2 text-sm">
               <span>&#128274;</span>
               <span className="text-[var(--muted)]">
                 Transfer is <span className="text-[var(--accent)]">fully encrypted</span>. No token movement on-chain.
-                Recipient claims later with the amount you share.
+                Recipient sees your message and claims with one click.
               </span>
             </div>
           </div>

@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash as sha256;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use anchor_spl::associated_token::AssociatedToken;
 use inco_lightning::cpi::accounts::{Allow, Operation};
@@ -130,7 +129,7 @@ pub mod veilpay {
 
     /// Confidential transfer: only updates encrypted state. No token movement.
     /// Tokens stay pooled in the vault. Recipient claims via claim_payment.
-    pub fn confidential_transfer<'info>(ctx: Context<'_, '_, 'info, 'info, ConfidentialTransfer<'info>>, amount_ciphertext: Vec<u8>, input_type: u8, amount: u64) -> Result<()> {
+    pub fn confidential_transfer<'info>(ctx: Context<'_, '_, 'info, 'info, ConfidentialTransfer<'info>>, amount_ciphertext: Vec<u8>, input_type: u8, amount: u64, memo: Vec<u8>) -> Result<()> {
         let vault = &mut ctx.accounts.vault_config;
         require!(!vault.is_frozen, VeilPayError::VaultFrozen);
         let whitelist = &ctx.accounts.whitelist;
@@ -185,12 +184,11 @@ pub mod veilpay {
         payment.nonce = nonce;
         payment.bump = ctx.bumps.payment_record;
         payment.is_settled = false;
-        // Store hash of (recipient + amount + nonce) for claim verification
-        let mut hash_input = Vec::with_capacity(48);
-        hash_input.extend_from_slice(ctx.accounts.recipient.key.as_ref());
-        hash_input.extend_from_slice(&amount.to_le_bytes());
-        hash_input.extend_from_slice(&nonce.to_le_bytes());
-        payment.amount_hash = sha256(&hash_input).to_bytes();
+        payment.amount = amount;
+        let mut memo_buf = [0u8; 128];
+        let len = memo.len().min(128);
+        memo_buf[..len].copy_from_slice(&memo[..len]);
+        payment.memo = memo_buf;
 
         let ra = &ctx.remaining_accounts;
         if ra.len() >= 8 {
@@ -214,20 +212,13 @@ pub mod veilpay {
         Ok(())
     }
 
-    /// Claim payment: Recipient withdraws tokens by proving they know the correct amount.
-    /// The program verifies hash(recipient + amount + nonce) matches the stored hash.
-    pub fn claim_payment(ctx: Context<ClaimPayment>, amount: u64) -> Result<()> {
+    /// Claim payment: Recipient withdraws their allocated tokens.
+    /// Amount is read directly from the payment record — no guessing needed.
+    pub fn claim_payment(ctx: Context<ClaimPayment>) -> Result<()> {
         let payment = &mut ctx.accounts.payment_record;
         require!(!payment.is_settled, VeilPayError::AlreadySettled);
 
-        // Verify the claim amount matches the hash stored during transfer
-        let mut hash_input = Vec::with_capacity(48);
-        hash_input.extend_from_slice(ctx.accounts.recipient.key.as_ref());
-        hash_input.extend_from_slice(&amount.to_le_bytes());
-        hash_input.extend_from_slice(&payment.nonce.to_le_bytes());
-        let computed_hash = sha256(&hash_input).to_bytes();
-        require!(computed_hash == payment.amount_hash, VeilPayError::InvalidClaimAmount);
-
+        let amount = payment.amount;
         let authority_key = ctx.accounts.vault_config.authority;
         let bump = ctx.accounts.vault_config.bump;
         let vault_account_info = ctx.accounts.vault_config.to_account_info();
@@ -404,9 +395,10 @@ pub struct PaymentRecord {
     pub nonce: u64,
     pub bump: u8,
     pub is_settled: bool,
-    pub amount_hash: [u8; 32],
+    pub amount: u64,
+    pub memo: [u8; 128],
 }
-impl PaymentRecord { pub const LEN: usize = 8 + 32 + 32 + 32 + 16 + 8 + 8 + 1 + 1 + 32 + 32; }
+impl PaymentRecord { pub const LEN: usize = 8 + 32 + 32 + 32 + 16 + 8 + 8 + 1 + 1 + 8 + 128 + 32; }
 
 // ============================================================
 // CONTEXTS

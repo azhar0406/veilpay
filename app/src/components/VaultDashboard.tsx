@@ -387,7 +387,7 @@ export default function VaultDashboard() {
             {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} onMyTotalChange={setMyDeposits} />}
 
             {/* Payment History */}
-            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} refreshKey={paymentRefreshKey} />}
+            {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} refreshKey={paymentRefreshKey} tokenMint={vault.tokenMint} />}
           </div>
         )}
       </main>
