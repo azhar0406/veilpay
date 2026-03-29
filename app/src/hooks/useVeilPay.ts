@@ -198,6 +198,10 @@ export function useVeilPay() {
         fetchAllVaults();
       } catch (err: unknown) {
         console.error("DEBUG initVault - ERROR:", err);
+        console.error("DEBUG initVault - message:", (err as any)?.message);
+        console.error("DEBUG initVault - logs:", (err as any)?.logs);
+        console.error("DEBUG initVault - toString:", String(err));
+        try { console.error("DEBUG initVault - JSON:", JSON.stringify(err, Object.getOwnPropertyNames(err as object))); } catch {}
         const msg =
           err instanceof Error ? err.message : "Failed to initialize vault";
         setError(msg);
