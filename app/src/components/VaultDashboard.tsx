@@ -50,6 +50,7 @@ export default function VaultDashboard() {
     selectVault,
     deselectVault,
     fetchAllVaults,
+    pendingPaymentsMap,
   } = useVeilPay();
 
   const [showInit, setShowInit] = useState(false);
@@ -61,6 +62,7 @@ export default function VaultDashboard() {
   const [myTransfersOut, setMyTransfersOut] = useState(0);
   const [paymentRefreshKey, setPaymentRefreshKey] = useState(0);
   const [depositRefreshKey, setDepositRefreshKey] = useState(0);
+  const [pendingPayments, setPendingPayments] = useState<Record<string, { count: number; latestMemo: string }>>({});
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
 
@@ -244,6 +246,7 @@ export default function VaultDashboard() {
             onSelect={selectVault}
             onCreate={() => setShowInit(true)}
             loading={loading}
+            pendingPayments={pendingPaymentsMap}
           />
         ) : (
           /* ===== VAULT EXISTS — MAIN DASHBOARD ===== */

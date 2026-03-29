@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VaultData, VaultListItem } from "@/hooks/useVeilPay";
+import { VaultData, VaultListItem, PaymentData } from "@/hooks/useVeilPay";
 import { USDC_MINT, USDT_MINT, getWhitelistPda } from "@/lib/anchor";
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onSelect: (pda: PublicKey, data: VaultData) => void;
   onCreate: () => void;
   loading: boolean;
+  pendingPayments?: Record<string, { count: number; latestMemo: string }>;
 }
 
 function getTokenName(mint: PublicKey): string {
@@ -46,7 +47,7 @@ async function fetchCreationTime(connection: Connection, pubkey: PublicKey): Pro
 
 type VaultRole = "authority" | "auditor" | "whitelisted" | "none";
 
-export default function VaultList({ vaults, onSelect, onCreate, loading }: Props) {
+export default function VaultList({ vaults, onSelect, onCreate, loading, pendingPayments = {} }: Props) {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const [creationTimes, setCreationTimes] = useState<Record<string, Date>>({});
@@ -141,6 +142,7 @@ export default function VaultList({ vaults, onSelect, onCreate, loading }: Props
             const rl = roleLabel[role];
             const created = creationTimes[key];
             const isOwn = role === "authority";
+            const pending = pendingPayments[key];
             return (
               <button
                 key={key}
@@ -179,6 +181,23 @@ export default function VaultList({ vaults, onSelect, onCreate, loading }: Props
                     </span>
                   )}
                 </div>
+
+                {/* Pending payment notification */}
+                {pending && pending.count > 0 && (
+                  <div className="mb-3 px-3 py-2 rounded-lg" style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)" }}>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span style={{ fontSize: "14px" }}>&#128172;</span>
+                      <span className="font-semibold" style={{ color: "#fbbf24" }}>
+                        {pending.count} pending payment{pending.count > 1 ? "s" : ""} to claim
+                      </span>
+                    </div>
+                    {pending.latestMemo && (
+                      <p className="text-xs mt-1 truncate" style={{ color: "#d4a017" }}>
+                        &ldquo;{pending.latestMemo}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">

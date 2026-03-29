@@ -72,6 +72,7 @@ export function useVeilPay() {
   const [vault, setVault] = useState<VaultData | null>(null);
   const [vaultPda, setVaultPda] = useState<PublicKey | null>(null);
   const [allVaults, setAllVaults] = useState<VaultListItem[]>([]);
+  const [pendingPaymentsMap, setPendingPaymentsMap] = useState<Record<string, { count: number; latestMemo: string }>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +85,27 @@ export function useVeilPay() {
     try {
       const vaults = await (program.account as any).vaultConfig.all();
       setAllVaults(vaults.map((v: any) => ({ publicKey: v.publicKey, data: v.account as VaultData })));
+
+      // Fetch pending payments for the connected wallet across all vaults
+      try {
+        const allPayments = await (program.account as any).paymentRecord.all([{ dataSize: 306 }]);
+        const pending: Record<string, { count: number; latestMemo: string }> = {};
+        for (const p of allPayments) {
+          if (p.account.recipient.equals(wallet.publicKey) && !p.account.isSettled) {
+            const vaultKey = p.account.vault.toBase58();
+            if (!pending[vaultKey]) pending[vaultKey] = { count: 0, latestMemo: "" };
+            pending[vaultKey].count++;
+            if (p.account.memo) {
+              const bytes = new Uint8Array(p.account.memo);
+              let end = bytes.indexOf(0);
+              if (end === -1) end = bytes.length;
+              const memo = end > 0 ? new TextDecoder().decode(bytes.slice(0, end)) : "";
+              if (memo) pending[vaultKey].latestMemo = memo;
+            }
+          }
+        }
+        setPendingPaymentsMap(pending);
+      } catch { /* ignore payment fetch errors */ }
     } catch {
       setAllVaults([]);
     }
@@ -662,5 +684,6 @@ export function useVeilPay() {
     selectVault,
     deselectVault,
     fetchAllVaults,
+    pendingPaymentsMap,
   };
 }
