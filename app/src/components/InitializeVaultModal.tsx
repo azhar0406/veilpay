@@ -33,8 +33,8 @@ export default function InitializeVaultModal({ onClose, onSubmit, loading }: Pro
 
     try {
       const mint = selectedMint === "usdc" ? USDC_MINT : USDT_MINT;
-      // Convert USD amount to raw units (6 decimals for USDC/USDT)
-      await onSubmit(auditor, Number(spendingLimit) * 1_000_000, mint);
+      // Pass USD amount directly — TEE stores human-readable values
+      await onSubmit(auditor, Number(spendingLimit), mint);
       onClose();
     } catch (err: unknown) {
       setLocalError(err instanceof Error ? err.message : "Transaction failed");
