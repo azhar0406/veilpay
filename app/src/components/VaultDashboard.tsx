@@ -148,9 +148,10 @@ export default function VaultDashboard() {
     if (!confirm("Are you sure? This will close the vault and return all tokens + rent to your wallet.")) return;
     try {
       await closeVault();
+      deselectVault();
       showToast("Vault closed — tokens returned", "success");
     } catch { showToast("Close vault failed", "error"); }
-  }, [closeVault, showToast]);
+  }, [closeVault, deselectVault, showToast]);
 
   const handleGrantAccess = useCallback(async () => {
     try {
