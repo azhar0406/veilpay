@@ -18,6 +18,7 @@ interface Props {
   vault: VaultData;
   onMyTotalChange?: (total: number) => void;
   myTransfersOut?: number;
+  refreshKey?: number;
 }
 
 function getTokenName(mint: PublicKey): string {
@@ -30,7 +31,7 @@ function truncate(key: string): string {
   return key.slice(0, 4) + "..." + key.slice(-4);
 }
 
-export default function DepositHistory({ vaultPda, vault, onMyTotalChange, myTransfersOut = 0 }: Props) {
+export default function DepositHistory({ vaultPda, vault, onMyTotalChange, myTransfersOut = 0, refreshKey = 0 }: Props) {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [deposits, setDeposits] = useState<DepositEntry[]>([]);
@@ -104,7 +105,7 @@ export default function DepositHistory({ vaultPda, vault, onMyTotalChange, myTra
     };
 
     fetchDeposits();
-  }, [vaultPda, connection, publicKey]);
+  }, [vaultPda, connection, publicKey, refreshKey]);
 
   return (
     <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-2xl p-6">

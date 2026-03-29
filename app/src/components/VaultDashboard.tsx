@@ -50,6 +50,7 @@ export default function VaultDashboard() {
   const [myDeposits, setMyDeposits] = useState(0);
   const [myTransfersOut, setMyTransfersOut] = useState(0);
   const [paymentRefreshKey, setPaymentRefreshKey] = useState(0);
+  const [depositRefreshKey, setDepositRefreshKey] = useState(0);
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
 
@@ -112,6 +113,7 @@ export default function VaultDashboard() {
     try {
       await deposit(amount);
       showToast(`Deposited ${amount} successfully`, "success");
+      setDepositRefreshKey((k) => k + 1);
     } catch { showToast("Deposit failed", "error"); throw new Error("failed"); }
   }, [deposit, showToast]);
 
@@ -399,7 +401,7 @@ export default function VaultDashboard() {
             {/* USX Faucet — only visible to whitelisted wallet */}
 
             {/* Deposit History */}
-            {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} onMyTotalChange={setMyDeposits} myTransfersOut={myTransfersOut} />}
+            {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} onMyTotalChange={setMyDeposits} myTransfersOut={myTransfersOut} refreshKey={depositRefreshKey} />}
 
             {/* Payment History */}
             {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} refreshKey={paymentRefreshKey} tokenMint={vault.tokenMint} />}
