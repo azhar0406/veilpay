@@ -48,6 +48,7 @@ export default function VaultDashboard() {
   const [showWhitelist, setShowWhitelist] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [myDeposits, setMyDeposits] = useState(0);
+  const [myTransfersOut, setMyTransfersOut] = useState(0);
   const [paymentRefreshKey, setPaymentRefreshKey] = useState(0);
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
@@ -56,7 +57,20 @@ export default function VaultDashboard() {
   useEffect(() => {
     setRevealedValues({});
     setRevealingKey(null);
+    setMyDeposits(0);
+    setMyTransfersOut(0);
   }, [publicKey]);
+
+  // Compute outgoing transfers total
+  useEffect(() => {
+    if (!publicKey || !vault) return;
+    fetchPayments().then((payments) => {
+      const out = payments
+        .filter((p) => p.sender.equals(publicKey) && p.amount)
+        .reduce((sum, p) => sum + (p.amount.toNumber ? p.amount.toNumber() : Number(p.amount)) / 1_000_000, 0);
+      setMyTransfersOut(out);
+    });
+  }, [publicKey, vault, fetchPayments, paymentRefreshKey]);
 
   const showToast = useCallback((message: string, type: "success" | "error") => {
     const id = Date.now();
@@ -384,7 +398,7 @@ export default function VaultDashboard() {
             {/* USX Faucet — only visible to whitelisted wallet */}
 
             {/* Deposit History */}
-            {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} onMyTotalChange={setMyDeposits} />}
+            {vault && vaultPda && <DepositHistory vaultPda={vaultPda} vault={vault} onMyTotalChange={setMyDeposits} myTransfersOut={myTransfersOut} />}
 
             {/* Payment History */}
             {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} refreshKey={paymentRefreshKey} tokenMint={vault.tokenMint} />}
@@ -419,7 +433,7 @@ export default function VaultDashboard() {
           onClose={() => setShowTransfer(false)}
           onSubmit={handleTransfer}
           loading={loading}
-          myDeposits={myDeposits}
+          myDeposits={Math.max(0, myDeposits - myTransfersOut)}
           tokenMint={vault.tokenMint}
         />
       )}

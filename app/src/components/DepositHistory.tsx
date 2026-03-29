@@ -17,6 +17,7 @@ interface Props {
   vaultPda: PublicKey;
   vault: VaultData;
   onMyTotalChange?: (total: number) => void;
+  myTransfersOut?: number;
 }
 
 function getTokenName(mint: PublicKey): string {
@@ -29,7 +30,7 @@ function truncate(key: string): string {
   return key.slice(0, 4) + "..." + key.slice(-4);
 }
 
-export default function DepositHistory({ vaultPda, vault, onMyTotalChange }: Props) {
+export default function DepositHistory({ vaultPda, vault, onMyTotalChange, myTransfersOut = 0 }: Props) {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [deposits, setDeposits] = useState<DepositEntry[]>([]);
@@ -94,9 +95,13 @@ export default function DepositHistory({ vaultPda, vault, onMyTotalChange }: Pro
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-white">Deposit History</h3>
         {myTotal > 0 && (
-          <span className="text-sm font-semibold" style={{ color: "#4ade80" }}>
-            My Deposits: {myTotal} {tokenName}
-          </span>
+          <div className="flex items-center gap-3 text-sm">
+            <span style={{ color: "var(--muted)" }}>Deposited: <span className="font-semibold text-white">{myTotal} {tokenName}</span></span>
+            {myTransfersOut > 0 && (
+              <span style={{ color: "var(--muted)" }}>Sent: <span className="font-semibold text-white">{myTransfersOut} {tokenName}</span></span>
+            )}
+            <span style={{ color: "#4ade80" }} className="font-semibold">Available: {Math.max(0, myTotal - myTransfersOut)} {tokenName}</span>
+          </div>
         )}
       </div>
 
