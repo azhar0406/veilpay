@@ -9,7 +9,6 @@ import InitializeVaultModal from "./InitializeVaultModal";
 import DepositModal from "./DepositModal";
 import TransferModal from "./TransferModal";
 import WhitelistManager from "./WhitelistManager";
-import AuditorView from "./AuditorView";
 import PaymentHistory from "./PaymentHistory";
 import VaultList from "./VaultList";
 
@@ -379,11 +378,6 @@ export default function VaultDashboard() {
             </div>
 
             {/* USX Faucet — only visible to whitelisted wallet */}
-
-            {/* Auditor View */}
-            {isAuditor && vault && vaultPda && (
-              <AuditorView vault={vault} vaultPda={vaultPda} />
-            )}
 
             {/* Payment History */}
             {vault && <PaymentHistory fetchPayments={fetchPayments} canDecrypt={!!(isAuthority || isAuditor)} isAuthority={!!isAuthority} grantPaymentAccess={grantPaymentAccess} claimPayment={claimPayment} connectedWallet={publicKey} />}
