@@ -18,12 +18,7 @@ function formatDecryptedValue(raw: string, tokenMint?: any): string {
   const num = Number(raw);
   if (isNaN(num) || raw === "N/A") return raw;
   const name = tokenMint?.equals?.(USDC_MINT) ? "USDC" : tokenMint?.equals?.(USDT_MINT) ? "USDT" : "";
-  // If value is large enough to be in raw token units (>= 1000), convert
-  // Otherwise show as-is (could be a small plaintext value from TEE)
-  if (num >= 1000) {
-    const uiAmount = num / 1_000_000;
-    return `${uiAmount} ${name}`.trim();
-  }
+  // TEE returns plaintext values as-is (not in raw token units)
   return `${num} ${name}`.trim();
 }
 
@@ -110,9 +105,7 @@ export default function VaultDashboard() {
     }
     setRevealingKey(key);
     try {
-      console.log("Decrypt request - key:", key, "handle:", handle);
       const result = await decryptHandle([handle], publicKey, signMessage);
-      console.log("Decrypt result - key:", key, "plaintext:", result.plaintexts[0], "error:", result.error);
       if (result.error) {
         showToast("Decryption failed: " + result.error, "error");
       }
